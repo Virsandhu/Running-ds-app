@@ -1,0 +1,6 @@
+{
+  "name": "ZoneRush - GPS Territory Conquest & Running Tracker",
+  "description": "Conquer real-world territory with every run. Turn your city into an athletic turf battleground with GPS loop tracking, rival sector defense, and local leaderboards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
