@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useZoneRush } from '../../context/ZoneRushContext';
+import { GoogleMapComponent } from '../map/GoogleMapComponent';
 import { audioService } from '../../services/audioService';
 
 export const ActiveRunScreen: React.FC = () => {
@@ -9,6 +10,14 @@ export const ActiveRunScreen: React.FC = () => {
     sealLoopAndFinish,
     setLockState,
     setCurrentTab,
+    isSimulatorActive,
+    setIsSimulatorActive,
+    simulationSpeed,
+    setSimulationSpeed,
+    stepSimulation,
+    gpsStatus,
+    gpsAccuracy,
+    setIsGpsModalOpen,
   } = useZoneRush();
 
   // Format seconds into MM:SS
@@ -73,92 +82,39 @@ export const ActiveRunScreen: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col relative w-full pt-16 pb-24 bg-surface max-w-md mx-auto select-none">
-      {/* Daytime Outdoor Map Tracking Canvas */}
+      {/* Real Google Map Tracking Canvas */}
       <div className="relative w-full h-[395px] overflow-hidden bg-slate-100">
-        {/* Bright Outdoor Vector Map Base */}
-        <div
-          className="absolute inset-0 w-full h-full bg-cover bg-center filter saturate-105 brightness-100 contrast-95"
-          style={{
-            backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuAddvTgqXei8JntCl_2y35E-9-4y6TLE1kJXcoiMr2QrBLVw6VSGgyz4Lp1l-f_KlKCscsqzRjOCaeRtThzQDloJu27vEFuB7kUAGwE_nA2xGWdsWAZoEzGL4JS2KxgobIt0KZHzg9Qn1vUJS63BKrG72rX0YYhlY2gia2TbpsZ97vfGrEQeiP-sL8eReNtXcI3fUdn2SnEh1TuDjsaHvfTx8aJmskZdGnL2P8S29v_fRD1V5agWZE')`,
-            filter: 'invert(0.92) hue-rotate(180deg) contrast(1.15) brightness(1.05)',
-          }}
-        />
-
-        {/* Crisp Vignette Overlay for Depth */}
-        <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-transparent to-slate-200/40 pointer-events-none" />
-
-        {/* Vector Territory & Strava Route Overlay */}
-        <svg
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          fill="none"
-          viewBox="0 0 390 395"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          {/* Territory Polygon Preview (Athletic Blue translucent + clean border) */}
-          <polygon
-            fill="#2563eb"
-            fillOpacity="0.14"
-            points="68,105 170,62 312,98 338,228 245,290 142,260 76,215"
-            stroke="#2563eb"
-            strokeDasharray="4 3"
-            strokeWidth="1.8"
-          />
-
-          {/* Dashed Return Closure Path */}
-          <path
-            d="M 245 290 Q 150 330 68 105"
-            stroke="#2563eb"
-            strokeDasharray="6 6"
-            strokeOpacity="0.6"
-            strokeWidth="2.5"
-          />
-
-          {/* Active Strava High-Contrast Route Polyline */}
-          <path
-            d="M 68 105 C 110 50, 240 45, 312 98 C 360 140, 360 210, 338 228 C 315 250, 275 275, 245 290"
-            stroke="#FC5200"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="5.5"
-          />
-
-          {/* Kilometer Markers along route */}
-          <g transform="translate(160, 65)">
-            <circle fill="#ffffff" r="4.5" stroke="#FC5200" strokeWidth="2" />
-          </g>
-          <g transform="translate(312, 98)">
-            <circle fill="#ffffff" r="4.5" stroke="#FC5200" strokeWidth="2" />
-          </g>
-          <g transform="translate(338, 228)">
-            <circle fill="#ffffff" r="4.5" stroke="#FC5200" strokeWidth="2" />
-          </g>
-
-          {/* Origin Pin (Start point) */}
-          <g transform="translate(68, 105)">
-            <circle fill="#1e293b" r="8" />
-            <circle fill="#ffffff" r="3.5" />
-          </g>
-
-          {/* Strava Live Runner Apex Beacon */}
-          <g transform="translate(245, 290)">
-            <circle className="animate-ping" fill="#FC5200" fillOpacity="0.25" r="18" />
-            <circle fill="#FC5200" r="10" stroke="#ffffff" strokeWidth="3" />
-            <polygon fill="#ffffff" points="0,-6 4,4 -4,4" />
-          </g>
-        </svg>
+        <GoogleMapComponent className="w-full h-full" zoom={15} />
 
         {/* Top Floating Status Pill Strip */}
-        <div className="absolute top-3 inset-x-3.5 flex flex-col gap-2 pointer-events-auto">
+        <div className="absolute top-3 inset-x-3.5 flex flex-col gap-2 pointer-events-auto z-10">
           {/* GPS and Status Strip */}
-          <div className="flex items-center justify-between px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md shadow-sm border border-slate-200">
+          <div
+            onClick={() => setIsGpsModalOpen(true)}
+            className="flex items-center justify-between px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md shadow-sm border border-slate-200 cursor-pointer active:scale-98 transition-transform"
+          >
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <span
+                className={`w-2.5 h-2.5 rounded-full ${
+                  gpsStatus === 'locked'
+                    ? 'bg-emerald-500 animate-pulse'
+                    : gpsStatus === 'searching'
+                    ? 'bg-amber-500 animate-ping'
+                    : 'bg-rose-500'
+                }`}
+              />
               <span className="text-[11px] font-bold font-metric tracking-wider uppercase text-slate-800">
-                GPS LOCKED
+                {gpsStatus === 'locked'
+                  ? isSimulatorActive
+                    ? 'SIMULATED GPS'
+                    : `GPS LOCKED (±${gpsAccuracy || 5}m)`
+                  : gpsStatus === 'searching'
+                  ? 'LOCATING GPS...'
+                  : 'GPS BLOCKED • TAP TO FIX'}
               </span>
               <span className="text-slate-300">|</span>
               <span className="text-[11px] font-medium text-slate-500">
-                0.02s Latency
+                {isSimulatorActive ? 'Demo Speed' : 'Live Hardware'}
               </span>
             </div>
             <div className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-full">
@@ -169,7 +125,7 @@ export const ActiveRunScreen: React.FC = () => {
                 sensors
               </span>
               <span className="text-[10px] text-slate-700 font-bold tracking-wider font-metric uppercase">
-                LIVE TRACK
+                {isSimulatorActive ? 'SIMULATION' : 'LIVE RUN'}
               </span>
             </div>
           </div>
@@ -211,7 +167,7 @@ export const ActiveRunScreen: React.FC = () => {
             </div>
             <button
               onClick={() => audioService.playBeacon()}
-              className="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full border border-blue-100 font-metric text-[10px] font-bold uppercase tracking-wider transition-colors"
+              className="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full border border-blue-100 font-metric text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-[14px]">turn_slight_left</span>
               <span>BEACON</span>
@@ -220,7 +176,7 @@ export const ActiveRunScreen: React.FC = () => {
         </div>
 
         {/* On-Map Floating Territory Indicator Tag */}
-        <div className="absolute top-[148px] left-3.5 pointer-events-none flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 backdrop-blur-md shadow-sm border border-blue-200">
+        <div className="absolute top-[148px] left-3.5 pointer-events-none flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 backdrop-blur-md shadow-sm border border-blue-200 z-10">
           <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
           <span className="text-[11px] font-metric font-bold text-blue-700 uppercase tracking-wider">
             EST. TERRITORY: +{runTelemetry.estimatedTerritoryYield} KM²
@@ -228,17 +184,17 @@ export const ActiveRunScreen: React.FC = () => {
         </div>
 
         {/* Floating Map Controls */}
-        <div className="absolute right-3.5 bottom-6 flex flex-col gap-2 pointer-events-auto">
+        <div className="absolute right-3.5 bottom-6 flex flex-col gap-2 pointer-events-auto z-10">
           <button
             onClick={() => setCurrentTab('map')}
-            className="w-10 h-10 rounded-full bg-white text-slate-700 border border-slate-200 flex items-center justify-center shadow-md active:scale-95 transition-transform hover:bg-slate-50"
+            className="w-10 h-10 rounded-full bg-white text-slate-700 border border-slate-200 flex items-center justify-center shadow-md active:scale-95 transition-transform hover:bg-slate-50 cursor-pointer"
             title="Inspect Territory"
           >
             <span className="material-symbols-outlined text-[19px]">layers</span>
           </button>
           <button
             onClick={() => audioService.playTick()}
-            className="w-10 h-10 rounded-full bg-white text-[#FC5200] border border-slate-200 flex items-center justify-center shadow-md active:scale-95 transition-transform hover:bg-slate-50"
+            className="w-10 h-10 rounded-full bg-white text-[#FC5200] border border-slate-200 flex items-center justify-center shadow-md active:scale-95 transition-transform hover:bg-slate-50 cursor-pointer"
             title="Recenter Tracking"
           >
             <span
@@ -286,7 +242,13 @@ export const ActiveRunScreen: React.FC = () => {
               <span className="font-metric text-[34px] leading-tight font-extrabold text-slate-900 tracking-tight">
                 {formatDuration(runTelemetry.durationSeconds)}
               </span>
-              <span className={`text-[10px] font-metric font-extrabold uppercase px-1.5 py-0.5 rounded-md ${runTelemetry.isPaused ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'bg-rose-50 text-rose-600 border border-rose-200'}`}>
+              <span
+                className={`text-[10px] font-metric font-extrabold uppercase px-1.5 py-0.5 rounded-md ${
+                  runTelemetry.isPaused
+                    ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                    : 'bg-rose-50 text-rose-600 border border-rose-200'
+                }`}
+              >
                 {runTelemetry.isPaused ? 'PAUSED' : 'REC'}
               </span>
             </div>
@@ -362,6 +324,55 @@ export const ActiveRunScreen: React.FC = () => {
           </span>
         </div>
 
+        {/* Laptop Testing Simulation Bar */}
+        <div className="p-2.5 rounded-xl bg-orange-50/80 border border-orange-200/90 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <button
+              type="button"
+              onClick={() => setIsSimulatorActive((prev) => !prev)}
+              className={`px-2.5 py-1 rounded-lg font-metric text-[10px] font-bold uppercase transition-colors cursor-pointer ${
+                isSimulatorActive
+                  ? 'bg-[#FC5200] text-white shadow-xs'
+                  : 'bg-white text-slate-600 border border-slate-200'
+              }`}
+            >
+              {isSimulatorActive ? '🏃 Sim: ON' : 'GPS Mode'}
+            </button>
+            <span className="text-[11px] font-sans text-slate-600 font-medium truncate">
+              {isSimulatorActive ? 'Auto-moving on map' : 'Using device hardware'}
+            </span>
+          </div>
+
+          {isSimulatorActive && (
+            <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center bg-white rounded-lg border border-slate-200 p-0.5">
+                {[1, 2, 5].map((spd) => (
+                  <button
+                    key={spd}
+                    type="button"
+                    onClick={() => setSimulationSpeed(spd)}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-metric font-bold cursor-pointer ${
+                      simulationSpeed === spd
+                        ? 'bg-[#FC5200] text-white'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    {spd}x
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={stepSimulation}
+                className="px-2 py-1 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 font-metric text-[10px] font-bold uppercase shadow-xs active:scale-95 transition-all cursor-pointer"
+                title="Advance 200m towards closing loop"
+              >
+                +200m
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Floating Athletic Action Buttons */}
         <div className="flex items-center gap-2.5 pt-1">
           {/* Strava Secondary Circular Pause Button */}
@@ -369,7 +380,7 @@ export const ActiveRunScreen: React.FC = () => {
             aria-label={runTelemetry.isPaused ? 'Resume tracking' : 'Pause tracking'}
             onClick={togglePauseRun}
             disabled={isLocked}
-            className={`w-14 h-14 shrink-0 rounded-full flex items-center justify-center shadow-sm active:scale-95 transition-all ${
+            className={`w-14 h-14 shrink-0 rounded-full flex items-center justify-center shadow-sm active:scale-95 transition-all cursor-pointer ${
               runTelemetry.isPaused
                 ? 'bg-[#FC5200] text-white border-2 border-[#FC5200]'
                 : 'bg-white text-slate-700 border-2 border-slate-200 hover:bg-slate-50'

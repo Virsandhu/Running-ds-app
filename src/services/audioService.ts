@@ -110,6 +110,21 @@ class AudioService {
       // Ignore audio policy errors
     }
   }
+
+  // User interaction unlocker for mobile Safari & Chrome
+  async unlockAudio(): Promise<boolean> {
+    try {
+      const ctx = this.getContext();
+      if (!ctx) return false;
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
+      this.playTick();
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 export const audioService = new AudioService();

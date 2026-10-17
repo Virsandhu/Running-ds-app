@@ -1,155 +1,157 @@
 import React from 'react';
 import { useZoneRush } from '../../context/ZoneRushContext';
+import { supabaseService } from '../../services/supabaseService';
+import { audioService } from '../../services/audioService';
+import { TERRITORY_PALETTE } from '../../utils/userColors';
 
 export const ProfileScreen: React.FC = () => {
-  const { userProfile } = useZoneRush();
+  const { currentUser, handleSignOut, userTerritoryColor, setUserTerritoryColor } = useZoneRush();
 
-  const trophies = [
-    { name: 'Apex Conqueror', icon: 'military_tech', color: 'text-amber-500', desc: 'Breached a Tier-1 Syndicate HQ' },
-    { name: '14-Day Streak', icon: 'local_fire_department', color: 'text-[#FC5200]', desc: '2 consecutive weeks of turf loops' },
-    { name: 'Night Raid Master', icon: 'dark_mode', color: 'text-purple-500', desc: 'Overtook a sector after 10 PM' },
-    { name: 'Loop Perfectionist', icon: 'donut_large', color: 'text-blue-500', desc: 'Closed a >5 km loop within 20m tolerance' },
-  ];
+  const onLogout = () => {
+    audioService.playTick();
+    handleSignOut();
+  };
 
   return (
     <div className="flex-1 flex flex-col relative w-full pt-20 pb-32 bg-[#F8FAFC] max-w-md mx-auto select-none">
       <div className="flex flex-col w-full px-4 gap-4">
-        {/* Profile Card */}
+        {/* Profile Card with Real User Data */}
         <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200/90 p-5 shadow-sm flex flex-col gap-4">
           <div className="flex items-center gap-3.5">
             <div className="relative p-1 rounded-full ring-3 ring-[#FC5200]">
               <img
-                src={userProfile.avatarUrl}
-                alt={userProfile.displayName}
+                src={currentUser?.avatarUrl || 'https://lh3.googleusercontent.com/aida-public/AB6AXuB4cnAh_eB0Xn3DbaM_wKpiKUbCpMQmRhwJc-4PG7YAtBY6OAUd4YHaLymaSlw-YUskAYQKoKh54TctIgWzPpcMErGMPHjFD3yCoR2LjJgFRPMYiMuWyw9_-ngJ3j0uFnBL2j9hJ4xNPkNOSqEQMUW73Set63WGQw-0oqd1WGOptvUZxpqA5cBdKFc5ktxObEh7TG6UjnrpXDV4-krPANwBocfxOvOEzegnzKoOwN0elCoaZB5XLck'}
+                alt={currentUser?.fullName || 'Runner'}
                 className="w-16 h-16 rounded-full object-cover"
                 referrerPolicy="no-referrer"
               />
               <div className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-[#FC5200] text-white font-metric text-[10px] font-bold shadow-sm">
-                LVL {userProfile.level}
+                LVL {currentUser?.level ?? 1}
               </div>
             </div>
 
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
                 <h2 className="font-sans text-lg font-extrabold text-slate-900">
-                  {userProfile.displayName}
+                  {currentUser?.fullName || 'Alex Chen'}
                 </h2>
-                <span className="material-symbols-outlined text-[18px] text-blue-600" style={{ fontVariationSettings: "'FILL' 1" }}>
+                <span
+                  className="material-symbols-outlined text-[18px] text-blue-600"
+                  style={{ fontVariationSettings: "'FILL' 1" }}
+                >
                   verified
                 </span>
               </div>
               <span className="font-metric text-xs text-slate-500 font-semibold">
-                {userProfile.username} • Apex Striders Syndicate
+                {currentUser?.username || '@AlexRunner'}
               </span>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[11px] font-bold text-emerald-600 font-metric">
-                  Rank #{userProfile.localRank} Local
-                </span>
-                <span className="text-slate-300">•</span>
-                <span className="text-[11px] text-[#FC5200] font-bold font-metric">
-                  {userProfile.zonesHeld} Sectors Controlled
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="material-symbols-outlined text-[14px] text-amber-500">school</span>
+                <span className="text-[11px] font-bold text-slate-700 font-sans">
+                  The Doon School, Dehradun
                 </span>
               </div>
             </div>
           </div>
 
-          {/* XP Progress Bar */}
-          <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col gap-1.5">
-            <div className="flex justify-between items-center text-xs">
-              <span className="font-metric font-bold text-slate-700">Level 24 Progression</span>
-              <span className="font-metric text-slate-500 font-semibold">
-                {userProfile.weeklyXp.toLocaleString()} / 6,000 XP
+          {/* Territory Dominance Banner */}
+          <div className="p-4 bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-xl shadow-xs flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                Active Campus Territory
+              </span>
+              <span className="text-base font-extrabold text-amber-300 mt-0.5">
+                The Doon School (Chandbagh)
+              </span>
+              <span className="text-[11px] text-slate-300">
+                72 Acres Estate • 0.29 km²
               </span>
             </div>
-            <div className="w-full h-2.5 rounded-full bg-slate-200 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-[#FC5200] to-amber-500 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, (userProfile.weeklyXp / 6000) * 100)}%` }}
-              />
+            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-amber-400">
+              <span className="material-symbols-outlined text-[22px]">domain</span>
             </div>
-            <span className="text-[10px] text-slate-400 font-sans">
-              1,150 XP needed to unlock Level 25 Elite Perimeter Cloak
+          </div>
+
+          {/* Occupied Territory Color Customizer & Showcase */}
+          <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-4 h-4 rounded-full shadow-xs border-2 border-white ring-1 ring-slate-300"
+                  style={{ backgroundColor: userTerritoryColor }}
+                />
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider font-sans">
+                  Your Occupied Territory Color
+                </span>
+              </div>
+              <span className="font-mono text-[11px] font-bold text-slate-500 uppercase px-2 py-0.5 rounded-full bg-white border border-slate-200">
+                {userTerritoryColor}
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-500 leading-relaxed font-sans">
+              Every runner in The Doon School has a distinct occupied color. Your claimed campus zones and live tracking beacon glow in your chosen athletic color.
+            </p>
+
+            <div className="grid grid-cols-5 gap-2 pt-1">
+              {TERRITORY_PALETTE.map((pal) => {
+                const isSelected = userTerritoryColor.toLowerCase() === pal.hex.toLowerCase();
+                return (
+                  <button
+                    key={pal.id}
+                    type="button"
+                    onClick={() => {
+                      audioService.playTick();
+                      setUserTerritoryColor(pal.hex);
+                    }}
+                    className={`flex flex-col items-center gap-1 p-1.5 rounded-xl border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-white border-slate-900 shadow-sm scale-105 ring-2 ring-slate-900/10'
+                        : 'bg-white/60 border-slate-200/80 hover:bg-white hover:border-slate-300'
+                    }`}
+                    title={pal.name}
+                  >
+                    <span
+                      className="w-6 h-6 rounded-full shadow-xs border border-black/10 flex items-center justify-center text-white"
+                      style={{ backgroundColor: pal.hex }}
+                    >
+                      {isSelected && (
+                        <span className="material-symbols-outlined text-[13px] font-bold">check</span>
+                      )}
+                    </span>
+                    <span className="text-[9px] font-semibold text-slate-600 truncate max-w-full text-center">
+                      {pal.name.split(' ')[0]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Backend Connection Status */}
+          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${supabaseService.isConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500'}`} />
+              <span className="text-xs font-bold text-slate-700 font-metric">
+                {supabaseService.isConfigured ? 'Supabase Cloud Sync: Connected' : 'Runner Profile: Active'}
+              </span>
+            </div>
+            <span className="text-[10px] font-metric text-slate-400 font-medium truncate max-w-[120px]">
+              {currentUser?.email || 'sandhuvir23@gmail.com'}
             </span>
           </div>
-
-          {/* Metric Quad */}
-          <div className="grid grid-cols-2 gap-2 text-center">
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col">
-              <span className="font-metric text-[10px] uppercase font-bold text-slate-400">
-                Total Dominance
-              </span>
-              <span className="font-metric text-2xl font-extrabold text-[#FC5200] mt-0.5">
-                {userProfile.territoryKm2} <span className="text-xs">km²</span>
-              </span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col">
-              <span className="font-metric text-[10px] uppercase font-bold text-slate-400">
-                Weekly Turf EXP
-              </span>
-              <span className="font-metric text-2xl font-extrabold text-slate-900 mt-0.5">
-                {userProfile.weeklyXp.toLocaleString()}
-              </span>
-            </div>
-          </div>
         </div>
 
-        {/* Trophies Case */}
-        <div className="relative rounded-2xl bg-white border border-slate-200/90 p-4 shadow-sm flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[20px] text-amber-500" style={{ fontVariationSettings: "'FILL' 1" }}>
-                emoji_events
-              </span>
-              <h3 className="font-metric text-sm font-bold text-slate-900 uppercase tracking-tight">
-                Conquest Badges
-              </h3>
-            </div>
-            <span className="font-metric text-xs text-slate-400">4 / 12 Unlocked</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            {trophies.map((t) => (
-              <div
-                key={t.name}
-                className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-1"
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className={`material-symbols-outlined text-[20px] ${t.color}`}>
-                    {t.icon}
-                  </span>
-                  <span className="font-sans text-xs font-bold text-slate-900 truncate">
-                    {t.name}
-                  </span>
-                </div>
-                <span className="text-[10px] text-slate-500 font-sans leading-tight">
-                  {t.desc}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Shoe & Gear Odometer */}
-        <div className="rounded-2xl bg-white border border-slate-200/90 p-4 shadow-sm flex flex-col gap-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[20px] text-slate-700">
-                roller_skating
-              </span>
-              <span className="font-metric text-sm font-bold text-slate-900 uppercase">
-                Active Footwear
-              </span>
-            </div>
-            <span className="font-metric text-xs font-bold text-[#FC5200]">Nike Vaporfly 3</span>
-          </div>
-
-          <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-            <div className="h-full bg-slate-800 rounded-full" style={{ width: '49.6%' }} />
-          </div>
-          <div className="flex justify-between items-center text-[11px] text-slate-500 font-metric font-medium">
-            <span>248 km tracked</span>
-            <span>500 km retirement target</span>
-          </div>
+        {/* Sign Out CTA */}
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={onLogout}
+            className="w-full py-3.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-metric text-xs uppercase tracking-wider font-bold flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer border border-slate-200"
+          >
+            <span className="material-symbols-outlined text-[18px]">logout</span>
+            <span>Sign Out</span>
+          </button>
         </div>
       </div>
     </div>

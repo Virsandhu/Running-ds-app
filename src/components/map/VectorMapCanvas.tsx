@@ -209,21 +209,6 @@ export const VectorMapCanvas: React.FC<VectorMapCanvasProps> = ({ className = ''
             PARK BLVD
           </text>
 
-          {/* Contested Hotspot Beacon: Zone #4 */}
-          <g
-            className="cursor-pointer group"
-            transform="translate(165, 335)"
-            onClick={() => handleSectorClick('sec-04')}
-          >
-            <circle cx="0" cy="0" fill="#EF4444" opacity="0.25" r="14">
-              <animate attributeName="r" dur="1.8s" repeatCount="indefinite" values="8;18;8" />
-              <animate attributeName="opacity" dur="1.8s" repeatCount="indefinite" values="0.4;0.05;0.4" />
-            </circle>
-            <circle cx="0" cy="0" fill="#EF4444" r="7" className="group-hover:scale-125 transition-transform" />
-            <text fill="#ffffff" fontFamily="'Space Grotesk', sans-serif" fontSize="8" fontWeight="700" textAnchor="middle" x="0" y="3">
-              !
-            </text>
-          </g>
 
           {/* USER LIVE GPS POSITION (Crisp Strava-Style Cobalt Beacon) */}
           <g transform="translate(195, 255)">

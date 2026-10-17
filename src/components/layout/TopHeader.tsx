@@ -14,7 +14,16 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   showBack = false,
   onBack,
 }) => {
-  const { userProfile, currentTab, setCurrentTab } = useZoneRush();
+  const {
+    currentUser,
+    currentTab,
+    setCurrentTab,
+    gpsStatus,
+    gpsAccuracy,
+    requestCurrentLocation,
+    setIsGpsModalOpen,
+    setIsPermissionsModalOpen,
+  } = useZoneRush();
 
   const handleBack = () => {
     if (onBack) {
@@ -61,15 +70,57 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                 <span className="font-extrabold text-[17px] tracking-tight text-slate-900 uppercase font-sans">
                   ZoneRush
                 </span>
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
-                  <span className="font-metric text-[10px] font-bold text-emerald-700 tracking-wider">
-                    GPS LOCK
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (gpsStatus !== 'locked') {
+                      requestCurrentLocation();
+                      setIsPermissionsModalOpen(true);
+                    } else {
+                      setIsGpsModalOpen(true);
+                    }
+                  }}
+                  aria-label="GPS Status and Settings"
+                  title="Click to view GPS status and permission settings"
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all active:scale-95 cursor-pointer shadow-2xs ${
+                    gpsStatus === 'locked'
+                      ? 'bg-emerald-50 hover:bg-emerald-100/80 border-emerald-300 text-emerald-800'
+                      : gpsStatus === 'searching'
+                      ? 'bg-amber-50 hover:bg-amber-100/80 border-amber-300 text-amber-800'
+                      : gpsStatus === 'denied'
+                      ? 'bg-rose-600 hover:bg-rose-700 border-rose-700 text-white animate-bounce'
+                      : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      gpsStatus === 'locked'
+                        ? 'bg-emerald-600 animate-pulse'
+                        : gpsStatus === 'searching'
+                        ? 'bg-amber-500 animate-ping'
+                        : gpsStatus === 'denied'
+                        ? 'bg-white'
+                        : 'bg-slate-400'
+                    }`}
+                  />
+                  <span className="font-metric text-[10px] font-extrabold tracking-wider uppercase">
+                    {gpsStatus === 'locked'
+                      ? gpsAccuracy
+                        ? `GPS LOCK (±${gpsAccuracy}m)`
+                        : 'GPS LOCKED'
+                      : gpsStatus === 'searching'
+                      ? 'LOCATING...'
+                      : gpsStatus === 'denied'
+                      ? 'ENABLE GPS ⚙️'
+                      : 'GPS SETUP'}
                   </span>
-                </div>
+                  <span className="material-symbols-outlined text-[13px] opacity-70">
+                    tune
+                  </span>
+                </button>
               </div>
               <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider font-sans">
-                {subtitle || (currentTab === 'ranks' ? 'Leaderboards' : currentTab === 'friends' ? 'Squads & Syndicates' : currentTab === 'profile' ? 'Runner Dossier' : 'Territory Map')}
+                {subtitle || (currentTab === 'profile' ? 'Runner Dossier' : 'Territory Map')}
               </span>
             </div>
           </div>
@@ -79,21 +130,21 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => setCurrentTab('profile')}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 active:scale-95 transition-all"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 active:scale-95 transition-all cursor-pointer"
           >
             <span className="font-metric text-[11px] text-slate-900 font-bold">
-              LVL {userProfile.level}
+              LVL {currentUser?.level ?? 1}
             </span>
           </button>
           <button
             onClick={() => setCurrentTab('profile')}
-            className="relative flex items-center justify-center p-0.5 rounded-full ring-2 ring-[#FC5200]/30 hover:ring-[#FC5200] transition-all active:scale-95"
+            className="relative flex items-center justify-center p-0.5 rounded-full ring-2 ring-[#FC5200]/30 hover:ring-[#FC5200] transition-all active:scale-95 cursor-pointer"
             aria-label="View Profile"
           >
             <img
               alt="Profile"
               className="w-8 h-8 rounded-full object-cover"
-              src={userProfile.avatarUrl}
+              src={currentUser?.avatarUrl || 'https://lh3.googleusercontent.com/aida-public/AB6AXuB4cnAh_eB0Xn3DbaM_wKpiKUbCpMQmRhwJc-4PG7YAtBY6OAUd4YHaLymaSlw-YUskAYQKoKh54TctIgWzPpcMErGMPHjFD3yCoR2LjJgFRPMYiMuWyw9_-ngJ3j0uFnBL2j9hJ4xNPkNOSqEQMUW73Set63WGQw-0oqd1WGOptvUZxpqA5cBdKFc5ktxObEh7TG6UjnrpXDV4-krPANwBocfxOvOEzegnzKoOwN0elCoaZB5XLck'}
               referrerPolicy="no-referrer"
             />
           </button>

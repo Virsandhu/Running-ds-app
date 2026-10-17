@@ -35,8 +35,8 @@ export const ConquestScreen: React.FC = () => {
     if (navigator.share) {
       navigator
         .share({
-          title: 'ZoneRush Sector Conquest',
-          text: `I just claimed Sector 14 (+${latestConquest?.capturedKm2 || 1.42} km²) on ZoneRush and surged up to #6 Local District!`,
+          title: 'The Doon School Territory Conquest',
+          text: `I just secured territory (+${latestConquest?.capturedKm2 || 0.29} km²) inside The Doon School (Chandbagh) on ZoneRush!`,
           url: window.location.href,
         })
         .catch(() => {});
@@ -224,29 +224,25 @@ export const ConquestScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Rank Surge Row */}
-          <div className="rounded-xl bg-orange-50/70 border border-orange-200/80 p-3 flex items-center justify-between">
+          {/* The Doon School Campus Turf Claim Row */}
+          <div className="rounded-xl bg-blue-50/70 border border-blue-200/80 p-3 flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-full bg-[#FC5200] text-white flex items-center justify-center shrink-0 shadow-sm">
-                <span className="material-symbols-outlined text-[20px]">north</span>
+              <div className="w-9 h-9 rounded-full bg-[#2563EB] text-white flex items-center justify-center shrink-0 shadow-sm">
+                <span className="material-symbols-outlined text-[20px]">school</span>
               </div>
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1">
-                  <span className="font-metric text-[15px] text-[#FC5200] font-extrabold tracking-tight">
-                    RANK SURGE
-                  </span>
-                  <span className="material-symbols-outlined text-[16px] text-[#FC5200]">
-                    military_tech
+                  <span className="font-metric text-[14px] text-[#2563EB] font-extrabold tracking-tight uppercase">
+                    Campus Territory Secured
                   </span>
                 </div>
                 <span className="text-[12px] text-slate-600 truncate font-sans">
-                  Moved from <span className="text-slate-900 font-semibold">#{latestConquest.previousRank}</span> to{' '}
-                  <span className="text-[#FC5200] font-bold">#{latestConquest.newRank}</span> Local District
+                  The Doon School • Chandbagh Estate, Dehradun
                 </span>
               </div>
             </div>
-            <div className="px-2.5 py-1 rounded-full bg-[#FC5200] text-white font-metric text-[11px] uppercase font-bold tracking-wider shrink-0 shadow-sm">
-              +{latestConquest.rankSurgeTiers} Tiers
+            <div className="px-2.5 py-1 rounded-full bg-[#2563EB] text-white font-metric text-[10px] uppercase font-bold tracking-wider shrink-0 shadow-sm">
+              72 Acres
             </div>
           </div>
 

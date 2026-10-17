@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useZoneRush } from '../../context/ZoneRushContext';
 import { audioService } from '../../services/audioService';
+import { getUniqueUserColor } from '../../utils/userColors';
 
 export const LeaderboardsScreen: React.FC = () => {
   const {
@@ -8,6 +9,7 @@ export const LeaderboardsScreen: React.FC = () => {
     leaderboardFilter,
     setLeaderboardFilter,
     startActivity,
+    userTerritoryColor,
   } = useZoneRush();
 
   const [challengeStatus, setChallengeStatus] = useState<string | null>(null);
@@ -136,22 +138,29 @@ export const LeaderboardsScreen: React.FC = () => {
                     2
                   </div>
                 </div>
-                <div className="flex items-center gap-0.5 text-slate-700 mt-1">
-                  <span className="material-symbols-outlined text-[13px] text-slate-400">
-                    shield
-                  </span>
+                <div className="flex items-center gap-1 text-slate-700 mt-1">
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0 shadow-2xs"
+                    style={{ backgroundColor: getUniqueUserColor(top2.username).hex }}
+                  />
                   <span className="font-metric text-[11px] font-bold truncate max-w-[64px]">
                     {top2.displayName}
                   </span>
                 </div>
-                <span className="font-metric text-lg font-extrabold text-slate-900 tracking-tight mt-0.5">
-                  {top2.territoryKm2}
-                </span>
-                <span className="font-metric text-[9px] uppercase font-semibold text-slate-400">
-                  km²
-                </span>
-                <div className="mt-1.5 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-500 font-metric text-[9px] font-medium">
-                  {top2.xp.toLocaleString()} XP
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="font-metric text-lg font-extrabold text-slate-900 tracking-tight">
+                    {top2.territoryKm2}
+                  </span>
+                  <span className="font-metric text-[9px] uppercase font-semibold text-slate-400">
+                    km²
+                  </span>
+                </div>
+                <div className="mt-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-500 font-metric text-[9px] font-medium flex items-center gap-1">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ backgroundColor: getUniqueUserColor(top2.username).hex }}
+                  />
+                  <span>Turf Color</span>
                 </div>
               </div>
             )}
@@ -180,25 +189,29 @@ export const LeaderboardsScreen: React.FC = () => {
                     1
                   </div>
                 </div>
-                <div className="flex items-center gap-0.5 text-amber-900 mt-1">
+                <div className="flex items-center gap-1 text-amber-900 mt-1">
                   <span
-                    className="material-symbols-outlined text-[13px] text-amber-600"
-                    style={{ fontVariationSettings: "'FILL' 1" }}
-                  >
-                    verified
-                  </span>
+                    className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
+                    style={{ backgroundColor: getUniqueUserColor(top1.username).hex }}
+                  />
                   <span className="font-metric text-xs font-bold truncate max-w-[72px]">
                     {top1.displayName}
                   </span>
                 </div>
-                <span className="font-metric text-2xl font-extrabold text-[#FC5200] tracking-tight mt-0.5">
-                  {top1.territoryKm2}
-                </span>
-                <span className="font-metric text-[10px] uppercase font-bold text-amber-700">
-                  km²
-                </span>
-                <div className="mt-1.5 px-2 py-0.5 rounded-full bg-white border border-amber-200 text-amber-900 font-metric text-[9px] font-bold shadow-2xs">
-                  {top1.xp.toLocaleString()} XP
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="font-metric text-2xl font-extrabold text-[#FC5200] tracking-tight">
+                    {top1.territoryKm2}
+                  </span>
+                  <span className="font-metric text-[10px] uppercase font-bold text-amber-700">
+                    km²
+                  </span>
+                </div>
+                <div className="mt-1 px-2 py-0.5 rounded-full bg-white border border-amber-200 text-amber-900 font-metric text-[9px] font-bold shadow-2xs flex items-center gap-1">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ backgroundColor: getUniqueUserColor(top1.username).hex }}
+                  />
+                  <span>Turf Color</span>
                 </div>
               </div>
             )}
@@ -219,22 +232,29 @@ export const LeaderboardsScreen: React.FC = () => {
                     3
                   </div>
                 </div>
-                <div className="flex items-center gap-0.5 text-amber-900 mt-1">
-                  <span className="material-symbols-outlined text-[13px] text-amber-700/70">
-                    shield
-                  </span>
+                <div className="flex items-center gap-1 text-amber-900 mt-1">
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0 shadow-2xs"
+                    style={{ backgroundColor: getUniqueUserColor(top3.username).hex }}
+                  />
                   <span className="font-metric text-[11px] font-bold truncate max-w-[64px]">
                     {top3.displayName}
                   </span>
                 </div>
-                <span className="font-metric text-lg font-extrabold text-slate-900 tracking-tight mt-0.5">
-                  {top3.territoryKm2}
-                </span>
-                <span className="font-metric text-[9px] uppercase font-semibold text-slate-400">
-                  km²
-                </span>
-                <div className="mt-1.5 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-500 font-metric text-[9px] font-medium">
-                  {top3.xp.toLocaleString()} XP
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="font-metric text-lg font-extrabold text-slate-900 tracking-tight">
+                    {top3.territoryKm2}
+                  </span>
+                  <span className="font-metric text-[9px] uppercase font-semibold text-slate-400">
+                    km²
+                  </span>
+                </div>
+                <div className="mt-1 px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-500 font-metric text-[9px] font-medium flex items-center gap-1">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ backgroundColor: getUniqueUserColor(top3.username).hex }}
+                  />
+                  <span>Turf Color</span>
                 </div>
               </div>
             )}

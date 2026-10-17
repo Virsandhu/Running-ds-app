@@ -8,6 +8,8 @@ export interface Sector {
   fillColor: string;
   areaKm2: number;
   points: string; // SVG polygon points string
+  paths?: { lat: number; lng: number }[];
+  centroid?: { lat: number; lng: number };
   isContested?: boolean;
   defenseWindowMinutes?: number;
   alertMessage?: string;
@@ -66,4 +68,4 @@ export interface ConquestYield {
   timestamp: string;
 }
 
-export type AppTab = 'map' | 'activity' | 'ranks' | 'friends' | 'profile';
+export type AppTab = 'map' | 'activity' | 'profile';
