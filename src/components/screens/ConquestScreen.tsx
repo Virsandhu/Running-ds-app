@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Map, AdvancedMarker, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
 import { useZoneRush } from '../../context/ZoneRushContext';
+import { DOON_SCHOOL_BOUNDS, DOON_SCHOOL_CAMPUS_TERRITORY } from '../map/GoogleMapComponent';
 
 interface ConfettiPiece {
   id: number;
@@ -11,15 +13,144 @@ interface ConfettiPiece {
   duration: number;
 }
 
+// Inverted mask to restrict conquest map strictly to The Doon School
+const ConquestMask: React.FC = () => {
+  const map = useMap();
+  const mapsLib = useMapsLibrary('maps');
+
+  useEffect(() => {
+    if (!map || !mapsLib) return;
+
+    const worldOuter = [
+      { lat: 85, lng: -180 },
+      { lat: 85, lng: 180 },
+      { lat: -85, lng: 180 },
+      { lat: -85, lng: -180 },
+    ];
+
+    const mask = new mapsLib.Polygon({
+      paths: [worldOuter, DOON_SCHOOL_CAMPUS_TERRITORY],
+      strokeColor: '#050811',
+      strokeOpacity: 1.0,
+      strokeWeight: 0,
+      fillColor: '#070B14',
+      fillOpacity: 1.0,
+      map,
+      clickable: false,
+      zIndex: 2,
+    });
+
+    return () => {
+      mask.setMap(null);
+    };
+  }, [map, mapsLib]);
+
+  return null;
+};
+
+// Polyline helper for conquest map
+const ConquestPolyline: React.FC<{
+  path: { lat: number; lng: number }[];
+  strokeColor: string;
+  strokeWeight?: number;
+  strokeOpacity?: number;
+  zIndex?: number;
+}> = ({ path, strokeColor, strokeWeight = 3, strokeOpacity = 0.95, zIndex = 6 }) => {
+  const map = useMap();
+  const mapsLib = useMapsLibrary('maps');
+
+  useEffect(() => {
+    if (!map || !mapsLib || path.length < 2) return;
+
+    const polyline = new mapsLib.Polyline({
+      path,
+      strokeColor,
+      strokeOpacity,
+      strokeWeight,
+      zIndex,
+      map,
+    });
+
+    return () => {
+      polyline.setMap(null);
+    };
+  }, [map, mapsLib, path, strokeColor, strokeWeight, strokeOpacity, zIndex]);
+
+  return null;
+};
+
+// Polygon helper for conquest map
+const ConquestPolygon: React.FC<{
+  paths: { lat: number; lng: number }[];
+  strokeColor: string;
+  fillColor: string;
+  fillOpacity?: number;
+  strokeWeight?: number;
+  strokeOpacity?: number;
+  zIndex?: number;
+}> = ({
+  paths,
+  strokeColor,
+  fillColor,
+  fillOpacity = 0.35,
+  strokeWeight = 2,
+  strokeOpacity = 0.85,
+  zIndex = 5,
+}) => {
+  const map = useMap();
+  const mapsLib = useMapsLibrary('maps');
+
+  useEffect(() => {
+    if (!map || !mapsLib || paths.length < 3) return;
+
+    const polygon = new mapsLib.Polygon({
+      paths,
+      strokeColor,
+      strokeOpacity,
+      strokeWeight,
+      fillColor,
+      fillOpacity,
+      zIndex,
+      map,
+    });
+
+    return () => {
+      polygon.setMap(null);
+    };
+  }, [map, mapsLib, paths, strokeColor, fillColor, fillOpacity, strokeWeight, strokeOpacity, zIndex]);
+
+  return null;
+};
+
+// Camera bounds controller for conquest map
+const ConquestMapCameraController: React.FC<{
+  paths: { lat: number; lng: number }[];
+}> = ({ paths }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || paths.length === 0) return;
+    if (typeof window !== 'undefined' && window.google?.maps?.LatLngBounds) {
+      const bounds = new window.google.maps.LatLngBounds();
+      paths.forEach((pt) => bounds.extend(pt));
+      map.fitBounds(bounds, 45);
+    } else {
+      map.panTo(paths[0]);
+    }
+  }, [map, paths]);
+
+  return null;
+};
+
 export const ConquestScreen: React.FC = () => {
-  const { latestConquest, closeConquestScreen } = useZoneRush();
+  const { latestConquest, closeConquestScreen, userTerritoryColor, userLocation } = useZoneRush();
   const [confetti, setConfetti] = useState<ConfettiPiece[]>([]);
   const [sharedNotice, setSharedNotice] = useState<string | null>(null);
 
   useEffect(() => {
     // Generate celebration confetti
-    const colors = ['#FC5200', '#0050cc', '#F59E0B', '#10B981', '#64748B'];
-    const pieces: ConfettiPiece[] = Array.from({ length: 32 }, (_, i) => ({
+    const colors = ['#FC5200', '#2563EB', '#F59E0B', '#10B981', '#0F172A'];
+    const pieces: ConfettiPiece[] = Array.from({ length: 28 }, (_, i) => ({
       id: i,
       left: Math.random() * 95,
       size: Math.random() * 6 + 4,
@@ -31,25 +162,38 @@ export const ConquestScreen: React.FC = () => {
     setConfetti(pieces);
   }, []);
 
+  const formatDuration = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const handleShare = () => {
     if (navigator.share) {
       navigator
         .share({
-          title: 'The Doon School Territory Conquest',
-          text: `I just secured territory (+${latestConquest?.capturedKm2 || 0.29} km²) inside The Doon School (Chandbagh) on ZoneRush!`,
+          title: 'Territory Conquest Sealed - ZoneRush',
+          text: `I just captured territory (+${latestConquest?.capturedKm2 || 0.05} km²) on ZoneRush! Sealed loop displacement: ${latestConquest?.displacementMeters || 0}m.`,
           url: window.location.href,
         })
         .catch(() => {});
     } else {
-      setSharedNotice('Victory link & story card copied to clipboard!');
+      setSharedNotice('Victory card link copied to clipboard!');
       setTimeout(() => setSharedNotice(null), 3000);
     }
   };
 
+  const mapCenter = useMemo(() => {
+    if (latestConquest?.polygonPaths && latestConquest.polygonPaths.length > 0) {
+      return latestConquest.polygonPaths[0];
+    }
+    return userLocation;
+  }, [latestConquest, userLocation]);
+
   if (!latestConquest) return null;
 
   return (
-    <div className="flex-1 flex flex-col relative w-full pt-16 pb-12 bg-surface max-w-md mx-auto select-none overflow-hidden">
+    <div className="flex-1 flex flex-col relative w-full pt-16 pb-12 bg-[#F8FAFC] max-w-md mx-auto select-none overflow-hidden">
       {/* Dynamic Confetti Burst */}
       <div
         aria-hidden="true"
@@ -76,19 +220,19 @@ export const ConquestScreen: React.FC = () => {
         {/* Celebration Header Card */}
         <div className="relative w-full rounded-2xl bg-white border border-slate-200/90 p-5 shadow-sm overflow-hidden mt-2">
           <div className="absolute -right-10 -top-10 w-36 h-36 rounded-full bg-orange-100/60 blur-xl pointer-events-none" />
-          <div className="absolute -left-10 -bottom-10 w-32 h-32 rounded-full bg-amber-100/50 blur-xl pointer-events-none" />
+          <div className="absolute -left-10 -bottom-10 w-32 h-32 rounded-full bg-blue-100/50 blur-xl pointer-events-none" />
 
-          <div className="relative z-10 flex flex-col items-center text-center space-y-2">
+          <div className="relative z-10 flex flex-col items-center text-center space-y-1.5">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span className="font-metric text-[10px] uppercase font-bold tracking-wider">
-                Tactical Conquest Finalized
+                Loop Sealed &amp; Territory Captured
               </span>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               <h2 className="font-sans text-[26px] uppercase tracking-tight text-slate-900 font-extrabold">
-                Territory Claimed!
+                Conquest Confirmed!
               </h2>
               <div className="flex items-center justify-center gap-1.5 text-[#FC5200]">
                 <span
@@ -97,113 +241,159 @@ export const ConquestScreen: React.FC = () => {
                 >
                   verified
                 </span>
-                <span className="font-metric text-[12px] uppercase tracking-wider font-bold">
-                  {latestConquest.sectorName} Captured &amp; Secured
+                <span className="font-metric text-[12px] uppercase tracking-wider font-bold text-slate-800">
+                  {latestConquest.sectorName}
                 </span>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2 text-slate-500 text-[12px] pt-0.5 font-sans">
-              <span className="material-symbols-outlined text-[15px] text-[#FC5200]">
-                vibration
-              </span>
-              <span>Haptic pulse confirmed</span>
-              <span className="text-slate-300">•</span>
-              <span className="material-symbols-outlined text-[15px] text-[#FC5200]">
-                volume_up
-              </span>
-              <span>Conquest fanfare active</span>
             </div>
           </div>
         </div>
 
-        {/* Strava-style Light GPS Map Card */}
-        <div className="relative w-full rounded-2xl bg-white border border-slate-200/90 shadow-sm overflow-hidden">
-          <div
-            className="w-full h-56 bg-cover bg-center relative"
-            style={{
-              backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuDnWidllapWL1efCQOiTh2Tysqac_RzU_mUaqwG1v2M7bWzaQ_uYr4XbvIMF6S5QDdR8WeHNCYvPi1ZQ961SFBSmS4SDpLG1eU6Ol5ZcDf4G6YgOJF2VerR4wWTTG2326ZMX_kgn2YPJEsL60iSh94hlfENFDL7QJPfyJNZifQEJe3Rh6yb7jK3N9lsBhWG7xqmESeC7ua6EBFvILXam_3nYjCZ_TK-hP2x-Do6j5dFQSHuhB0ks5A')`,
+        {/* Real Live Google Map Card showing EXACT captured location */}
+        <div className="relative w-full h-64 rounded-2xl bg-white border border-slate-200/90 shadow-sm overflow-hidden">
+          <Map
+            id="conquest-result-map"
+            mapId="CONQUEST_MAP_ID"
+            internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+            defaultCenter={mapCenter}
+            defaultZoom={17}
+            restriction={{
+              latLngBounds: DOON_SCHOOL_BOUNDS,
+              strictBounds: true,
             }}
+            mapTypeId="hybrid"
+            gestureHandling="greedy"
+            disableDefaultUI={true}
+            className="w-full h-full"
           >
-            <div className="absolute inset-0 bg-white/45 backdrop-contrast-125" />
-            <svg
-              className="absolute inset-0 w-full h-full pointer-events-none"
-              fill="none"
-              viewBox="0 0 360 224"
-            >
-              {/* Rival dashed line */}
-              <path
-                d="M 55 148 L 100 68 L 235 50 L 310 115 L 260 182 L 125 174 Z"
-                fill="rgba(239, 68, 68, 0.08)"
-                stroke="#EF4444"
-                strokeDasharray="4 4"
-                strokeWidth="2"
+            {/* Camera auto-fit to captured polygon coordinates */}
+            <ConquestMapCameraController
+              paths={
+                latestConquest.polygonPaths.length > 0
+                  ? latestConquest.polygonPaths
+                  : [userLocation]
+              }
+            />
+
+            {/* Mask strictly hiding anything outside The Doon School */}
+            <ConquestMask />
+
+            {/* The Doon School Campus Area (Shaded very lightly so all geographical features are visible) */}
+            <ConquestPolygon
+              paths={DOON_SCHOOL_CAMPUS_TERRITORY}
+              strokeColor="#F59E0B"
+              fillColor="#F59E0B"
+              fillOpacity={0.04}
+              strokeWeight={1.8}
+              strokeOpacity={0.7}
+              zIndex={3}
+            />
+
+            {/* Translucent movement corridor shading in user's chosen territory color */}
+            {latestConquest.rawGpsTrail && latestConquest.rawGpsTrail.length >= 2 && (
+              <ConquestPolyline
+                path={latestConquest.rawGpsTrail}
+                strokeColor={userTerritoryColor}
+                strokeWeight={12}
+                strokeOpacity={0.16}
+                zIndex={6}
               />
-              <text
-                className="font-metric text-[9px] uppercase tracking-wider font-bold"
-                fill="#DC2626"
-                x="205"
-                y="72"
+            )}
+
+            {/* Dark black, slightly thin trail of user's movement */}
+            {latestConquest.rawGpsTrail && latestConquest.rawGpsTrail.length >= 2 && (
+              <ConquestPolyline
+                path={latestConquest.rawGpsTrail}
+                strokeColor="#000000"
+                strokeWeight={2.2}
+                strokeOpacity={0.95}
+                zIndex={7}
+              />
+            )}
+
+            {/* Displacement Line joining start and end points of the run (shortest distance) */}
+            {latestConquest.rawGpsTrail && latestConquest.rawGpsTrail.length >= 2 && (
+              <ConquestPolyline
+                path={[
+                  latestConquest.rawGpsTrail[0],
+                  latestConquest.rawGpsTrail[latestConquest.rawGpsTrail.length - 1],
+                ]}
+                strokeColor="#2563EB"
+                strokeWeight={2.2}
+                strokeOpacity={0.9}
+                zIndex={8}
+              />
+            )}
+
+            {/* Enclosed Captured Territory Polygon shaded very lightly in User's chosen color */}
+            {latestConquest.polygonPaths && latestConquest.polygonPaths.length >= 3 && (
+              <ConquestPolygon
+                paths={latestConquest.polygonPaths}
+                strokeColor={userTerritoryColor}
+                fillColor={userTerritoryColor}
+                fillOpacity={0.10}
+                strokeWeight={2.0}
+                strokeOpacity={0.75}
+                zIndex={5}
+              />
+            )}
+
+            {/* Start point marker */}
+            {latestConquest.rawGpsTrail && latestConquest.rawGpsTrail.length > 0 && (
+              <AdvancedMarker position={latestConquest.rawGpsTrail[0]}>
+                <div className="flex flex-col items-center">
+                  <div className="bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-md border border-white flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                    <span>START</span>
+                  </div>
+                  <div className="w-1.5 h-1.5 bg-emerald-600 rotate-45 -mt-0.5" />
+                </div>
+              </AdvancedMarker>
+            )}
+
+            {/* Finish point marker */}
+            {latestConquest.rawGpsTrail && latestConquest.rawGpsTrail.length > 1 && (
+              <AdvancedMarker
+                position={latestConquest.rawGpsTrail[latestConquest.rawGpsTrail.length - 1]}
               >
-                Rival Zone Breached
-              </text>
+                <div className="flex flex-col items-center">
+                  <div className="bg-[#FC5200] text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-md border border-white flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                    <span>FINISH</span>
+                  </div>
+                  <div className="w-1.5 h-1.5 bg-[#FC5200] rotate-45 -mt-0.5" />
+                </div>
+              </AdvancedMarker>
+            )}
+          </Map>
 
-              {/* Blue territory captured enclosed polygon */}
-              <path
-                d="M 50 138 L 110 44 L 270 34 L 325 126 L 240 192 L 95 184 Z"
-                fill="rgba(2, 102, 255, 0.22)"
-                stroke="none"
-              />
+          {/* Floating Map Legend Tag */}
+          <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1 rounded-full shadow-sm border border-slate-200/80 pointer-events-none">
+            <span className="material-symbols-outlined text-[15px] text-emerald-600">
+              verified
+            </span>
+            <span className="font-metric text-[10px] font-bold text-slate-800 uppercase tracking-wider">
+              Real GPS Territory Synced
+            </span>
+          </div>
 
-              {/* Strava orange completed route loop stroke */}
-              <path
-                d="M 50 138 L 110 44 L 270 34 L 325 126 L 240 192 L 95 184 Z"
-                stroke="#FC5200"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="3.5"
-                filter="drop-shadow(0px 1px 3px rgba(252, 82, 0, 0.4))"
-              />
-
-              {/* GPS start/pin node */}
-              <circle cx="50" cy="138" fill="#ffffff" r="6" stroke="#FC5200" strokeWidth="2.5" />
-              <circle
-                className="animate-ping"
-                cx="50"
-                cy="138"
-                opacity="0.6"
-                r="10"
-                stroke="#FC5200"
-                strokeWidth="1.5"
-              />
-            </svg>
-
-            <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1 rounded-full shadow-sm border border-slate-200/80">
-              <span className="material-symbols-outlined text-[15px] text-[#FC5200]">
-                polyline
-              </span>
-              <span className="font-metric text-[10px] font-bold text-slate-800 uppercase tracking-wider">
-                Closed Loop Confirmed
-              </span>
-            </div>
-
-            <div className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-full shadow-sm border border-slate-200/80">
-              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-              <span className="font-metric text-[10px] font-medium text-slate-600 uppercase">
-                Blue: Captured (+{latestConquest.capturedKm2} km²)
-              </span>
-            </div>
+          {/* Floating Displacement Tag */}
+          <div className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-full shadow-sm border border-slate-200/80 pointer-events-none">
+            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+            <span className="font-metric text-[10px] font-semibold text-slate-700">
+              Shortest Gap Sealed: {latestConquest.displacementMeters}m
+            </span>
           </div>
         </div>
 
         {/* Primary Performance Yield & Stats */}
-        <div className="rounded-2xl bg-white border border-slate-200/90 p-4 shadow-sm flex flex-col space-y-4">
-          {/* Big Yield Hero */}
+        <div className="rounded-2xl bg-white border border-slate-200/90 p-4 shadow-sm flex flex-col space-y-3.5">
+          {/* Big Yield Hero: Area Calculated */}
           <div className="flex flex-col items-center text-center space-y-1 pt-1">
-            <span className="font-metric text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
-              Primary Conquest Yield
+            <span className="text-[11px] font-metric uppercase tracking-wider text-slate-500 font-bold">
+              Area Occupied &amp; Claimed
             </span>
-            <div className="flex items-baseline justify-center gap-1">
+            <div className="flex items-baseline justify-center gap-1.5">
               <span className="font-metric text-[40px] font-extrabold text-[#FC5200] tracking-tight">
                 +{latestConquest.capturedKm2}
               </span>
@@ -211,42 +401,37 @@ export const ConquestScreen: React.FC = () => {
                 km²
               </span>
             </div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[12px] font-sans">
-              <span className="text-slate-500">Dominance:</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[12px] font-sans">
               <span className="font-semibold text-slate-800">
-                {latestConquest.previousDominanceKm2} km²
+                {latestConquest.capturedM2.toLocaleString()} m²
               </span>
-              <span className="text-[#FC5200] font-bold">→</span>
-              <span className="font-semibold text-slate-900">
-                {latestConquest.newDominanceKm2} km²
+              <span className="text-slate-400">•</span>
+              <span className="font-semibold text-slate-800">
+                {latestConquest.acresCaptured} Acres
               </span>
-              <span className="text-emerald-600 font-bold">(+11.1%)</span>
             </div>
           </div>
 
-          {/* The Doon School Campus Turf Claim Row */}
-          <div className="rounded-xl bg-blue-50/70 border border-blue-200/80 p-3 flex items-center justify-between">
+          {/* Loop Closure & Displacement Card */}
+          <div className="rounded-xl bg-blue-50/70 border border-blue-200/80 p-3.5 flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-9 h-9 rounded-full bg-[#2563EB] text-white flex items-center justify-center shrink-0 shadow-sm">
-                <span className="material-symbols-outlined text-[20px]">school</span>
+                <span className="material-symbols-outlined text-[20px]">timeline</span>
               </div>
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1">
-                  <span className="font-metric text-[14px] text-[#2563EB] font-extrabold tracking-tight uppercase">
-                    Campus Territory Secured
+                  <span className="font-metric text-[13px] text-[#2563EB] font-extrabold tracking-tight uppercase">
+                    Loop Joined at Shortest Distance
                   </span>
                 </div>
-                <span className="text-[12px] text-slate-600 truncate font-sans">
-                  The Doon School • Chandbagh Estate, Dehradun
+                <span className="text-[11px] text-slate-600 font-sans">
+                  Start and end points sealed via displacement: <strong>{latestConquest.displacementMeters} meters</strong>
                 </span>
               </div>
             </div>
-            <div className="px-2.5 py-1 rounded-full bg-[#2563EB] text-white font-metric text-[10px] uppercase font-bold tracking-wider shrink-0 shadow-sm">
-              72 Acres
-            </div>
           </div>
 
-          {/* Clean Strava Style 2x2 Telemetry Grid */}
+          {/* Clean Athletic 2x2 Telemetry Grid */}
           <div className="grid grid-cols-2 gap-2.5">
             <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3 flex flex-col">
               <span className="font-metric text-[10px] uppercase text-slate-500 font-semibold">
@@ -256,7 +441,7 @@ export const ConquestScreen: React.FC = () => {
                 {latestConquest.distanceKm.toFixed(2)}
               </span>
               <span className="font-metric text-[10px] text-slate-400 uppercase font-medium">
-                Kilometers
+                Kilometers Ran
               </span>
             </div>
 
@@ -265,7 +450,7 @@ export const ConquestScreen: React.FC = () => {
                 Duration
               </span>
               <span className="font-metric text-[26px] text-slate-900 font-bold leading-tight mt-0.5">
-                26:14
+                {formatDuration(latestConquest.durationSeconds)}
               </span>
               <span className="font-metric text-[10px] text-slate-400 uppercase font-medium">
                 Minutes : Seconds
@@ -286,101 +471,14 @@ export const ConquestScreen: React.FC = () => {
 
             <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3 flex flex-col">
               <span className="font-metric text-[10px] uppercase text-slate-500 font-semibold">
-                Burn
+                Calories Burned
               </span>
               <span className="font-metric text-[26px] text-slate-900 font-bold leading-tight mt-0.5">
                 {latestConquest.caloriesBurned}
               </span>
               <span className="font-metric text-[10px] text-slate-400 uppercase font-medium">
-                Total Kcal
+                Active Kcal
               </span>
-            </div>
-          </div>
-
-          {/* Social / Rival Impact Card */}
-          <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3 flex flex-col space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[17px] text-rose-500">
-                  person_remove
-                </span>
-                <span className="font-metric text-[11px] uppercase text-slate-600 font-bold">
-                  Rival Impact
-                </span>
-              </div>
-              <span className="font-metric text-[10px] text-rose-600 uppercase tracking-wider font-bold bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
-                {latestConquest.displacedRivals.length} Displaced
-              </span>
-            </div>
-
-            {latestConquest.displacedRivals.map((rival) => (
-              <div
-                key={rival.username}
-                className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-slate-200/60 shadow-xs"
-              >
-                <div className="flex items-center gap-2.5">
-                  <img
-                    className="w-8 h-8 rounded-full object-cover ring-1 ring-slate-200"
-                    src={rival.avatarUrl}
-                    alt={rival.username}
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="flex flex-col">
-                    <span className="font-sans text-[13px] text-slate-800 font-bold">
-                      {rival.username}
-                    </span>
-                    <span className="text-[11px] text-slate-500 font-sans">
-                      {rival.note}
-                    </span>
-                  </div>
-                </div>
-                <span className="font-metric text-[11px] text-rose-600 uppercase font-bold">
-                  -{rival.lostKm2} km²
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Streak & Bonus Cards */}
-          <div className="grid grid-cols-2 gap-2.5">
-            <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3 flex flex-col justify-between">
-              <div className="flex items-center gap-1.5 text-amber-600">
-                <span
-                  className="material-symbols-outlined text-[18px]"
-                  style={{ fontVariationSettings: "'FILL' 1" }}
-                >
-                  local_fire_department
-                </span>
-                <span className="font-metric text-[10px] uppercase font-bold">
-                  14-Day Streak
-                </span>
-              </div>
-              <div className="flex items-baseline justify-between mt-2">
-                <span className="text-[12px] text-slate-500 font-sans">Bonus XP</span>
-                <span className="font-metric text-[18px] text-amber-600 font-bold">
-                  +{latestConquest.streakBonusXp}
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3 flex flex-col justify-between">
-              <div className="flex items-center gap-1.5 text-[#FC5200]">
-                <span
-                  className="material-symbols-outlined text-[18px]"
-                  style={{ fontVariationSettings: "'FILL' 1" }}
-                >
-                  bolt
-                </span>
-                <span className="font-metric text-[10px] uppercase font-bold">
-                  Conquest Loot
-                </span>
-              </div>
-              <div className="flex items-baseline justify-between mt-2">
-                <span className="text-[12px] text-slate-500 font-sans">Total XP</span>
-                <span className="font-metric text-[18px] text-[#FC5200] font-bold">
-                  +{latestConquest.totalLootXp.toLocaleString()}
-                </span>
-              </div>
             </div>
           </div>
         </div>
@@ -400,11 +498,6 @@ export const ConquestScreen: React.FC = () => {
           >
             <span className="material-symbols-outlined text-[20px]">ios_share</span>
             <span>Share Victory Card</span>
-            <div className="flex items-center gap-1 ml-1 px-2 py-0.5 rounded-full bg-white/20 text-white">
-              <span className="font-metric text-[9px] uppercase font-extrabold tracking-wider">
-                Story Ready
-              </span>
-            </div>
           </button>
 
           <button

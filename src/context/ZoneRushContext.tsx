@@ -4,6 +4,14 @@ import { INITIAL_SECTORS, DEFAULT_CONQUEST_YIELD, INITIAL_LEADERBOARD } from '..
 import { supabaseService, UserRunnerProfile } from '../services/supabaseService';
 import { audioService } from '../services/audioService';
 import { getUniqueUserColor, hexToRgba } from '../utils/userColors';
+import {
+  calculateDistanceKm,
+  calculateDistanceMeters,
+  calculateBearing,
+  getCompassDirection,
+  calculateDisplacement,
+  calculatePolygonArea,
+} from '../utils/geoUtils';
 
 interface ZoneRushContextType {
   currentTab: AppTab;
@@ -65,20 +73,6 @@ interface ZoneRushContextType {
 
 const ZoneRushContext = createContext<ZoneRushContextType | undefined>(undefined);
 
-// Haversine formula to compute distance in km between two GPS coordinates
-const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
 
 export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentTab, setCurrentTab] = useState<AppTab>('map');
@@ -307,30 +301,22 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Active Run State
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [runTelemetry, setRunTelemetry] = useState<RunTelemetry>({
-    distanceKm: 3.84,
-    durationSeconds: 1122, // 18m 42s initially
-    paceSeconds: 292, // 4:52 /km
-    bpm: 162,
-    spm: 176,
-    estimatedTerritoryYield: 1.42,
-    loopProgressPct: 74,
-    distanceToSealMeters: 184,
+    distanceKm: 0.0,
+    durationSeconds: 0,
+    paceSeconds: 0,
+    bpm: 142,
+    spm: 160,
+    estimatedTerritoryYield: 0.0,
+    loopProgressPct: 0,
+    distanceToSealMeters: 0,
+    displacementMeters: 0,
     isPaused: false,
     isLocked: false,
-    targetSyndicate: 'Neon Syndicate HQ',
-    routePoints: [
-      [68, 105],
-      [110, 50],
-      [160, 65],
-      [240, 45],
-      [312, 98],
-      [360, 140],
-      [360, 210],
-      [338, 228],
-      [315, 250],
-      [275, 275],
-      [245, 290],
-    ],
+    targetSyndicate: 'Campus Turf',
+    routePoints: [],
+    gpsTrail: [],
+    currentBearing: undefined,
+    currentDirection: undefined,
   });
 
   // Auto-acquire position on mount and listen to movement continuously
@@ -339,69 +325,107 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // Check permissions API if available to auto-refresh on user permission grant
     if (typeof navigator !== 'undefined' && navigator.permissions?.query) {
-      navigator.permissions.query({ name: 'geolocation' }).then((status) => {
-        if (status.state === 'granted') {
-          requestCurrentLocation();
-        }
-        status.onchange = () => {
+      navigator.permissions
+        .query({ name: 'geolocation' })
+        .then((status) => {
           if (status.state === 'granted') {
             requestCurrentLocation();
-          } else if (status.state === 'denied') {
-            setGpsStatus('denied');
           }
-        };
-      }).catch(() => {});
+          status.onchange = () => {
+            if (status.state === 'granted') {
+              requestCurrentLocation();
+            } else if (status.state === 'denied') {
+              setGpsStatus('denied');
+            }
+          };
+        })
+        .catch(() => {});
     }
 
     if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
       const watchId = navigator.geolocation.watchPosition(
         (pos) => {
           const newCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          const acc = Math.round(pos.coords.accuracy);
           setUserLocation(newCoords);
-          setGpsAccuracy(Math.round(pos.coords.accuracy));
+          setGpsAccuracy(acc);
           setGpsStatus('locked');
           setGpsErrorMessage(null);
 
-          // If actively running with real GPS, accumulate distance
-          if (isRunning && !isSimulatorActive && lastTrackedLocationRef.current) {
-            const distDeltaKm = calculateDistanceKm(
-              lastTrackedLocationRef.current.lat,
-              lastTrackedLocationRef.current.lng,
-              newCoords.lat,
-              newCoords.lng
-            );
-
-            // Filter out minor jitter (< 4 meters) and GPS jumps (> 500m)
-            if (distDeltaKm > 0.004 && distDeltaKm < 0.5) {
-              setRunTelemetry((prev) => {
-                const newDist = parseFloat((prev.distanceKm + distDeltaKm).toFixed(2));
-                const newProgress = Math.min(100, Math.round(prev.loopProgressPct + distDeltaKm * 15));
-                const newSeal = Math.max(0, Math.round(prev.distanceToSealMeters - distDeltaKm * 1000));
-                const paceSecs = newDist > 0.1 ? Math.round(prev.durationSeconds / newDist) : prev.paceSeconds;
-
+          // If actively running with real GPS, accurately track movement and append trail
+          if (isRunning && !isSimulatorActive && !runTelemetry.isPaused) {
+            setRunTelemetry((prev) => {
+              const trail = prev.gpsTrail || [];
+              if (trail.length === 0) {
                 return {
                   ...prev,
-                  distanceKm: newDist,
-                  loopProgressPct: newProgress,
-                  distanceToSealMeters: newSeal,
-                  paceSeconds: paceSecs,
+                  gpsTrail: [newCoords],
                 };
-              });
-            }
+              }
+
+              const lastPt = trail[trail.length - 1];
+              const distDeltaMeters = calculateDistanceMeters(
+                lastPt.lat,
+                lastPt.lng,
+                newCoords.lat,
+                newCoords.lng
+              );
+              const distDeltaKm = distDeltaMeters / 1000;
+
+              // Filter out stationary jitter (< 2.5 meters) or wild GPS teleportation (> 600m)
+              if (distDeltaMeters < 2.5 || distDeltaKm > 0.6) {
+                // When stopped or jitter: trail stays right where user is, no distance added
+                return prev;
+              }
+
+              // Real movement confirmed: append to trail
+              const updatedTrail = [...trail, newCoords];
+              const newTotalDistKm = parseFloat((prev.distanceKm + distDeltaKm).toFixed(3));
+              const bearing = calculateBearing(lastPt.lat, lastPt.lng, newCoords.lat, newCoords.lng);
+              const dir = getCompassDirection(bearing);
+              const disp = calculateDisplacement(updatedTrail);
+
+              // Calculate occupied area if loop were closed now
+              let areaYield = 0;
+              if (updatedTrail.length >= 3) {
+                const areaCalc = calculatePolygonArea([...updatedTrail, updatedTrail[0]]);
+                areaYield = areaCalc.areaKm2;
+              }
+
+              // Loop progress calculation
+              let loopProgress = 0;
+              if (newTotalDistKm > 0.08) {
+                loopProgress = Math.min(100, Math.max(10, Math.round((1 - Math.min(disp.meters, 250) / 250) * 100)));
+              }
+
+              const pace = newTotalDistKm > 0.02 ? Math.round(prev.durationSeconds / newTotalDistKm) : 0;
+
+              return {
+                ...prev,
+                distanceKm: newTotalDistKm,
+                gpsTrail: updatedTrail,
+                currentBearing: bearing,
+                currentDirection: dir,
+                displacementMeters: disp.meters,
+                distanceToSealMeters: disp.meters,
+                loopProgressPct: loopProgress,
+                estimatedTerritoryYield: areaYield,
+                paceSeconds: pace,
+              };
+            });
           }
           lastTrackedLocationRef.current = newCoords;
         },
         (err) => {
-          // Do not overwrite locked status with transient watch timeouts
           if (err.code === err.PERMISSION_DENIED) {
             setGpsStatus('denied');
           }
         },
-        { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 }
+        { enableHighAccuracy: true, maximumAge: 2000, timeout: 25000 }
       );
       return () => navigator.geolocation.clearWatch(watchId);
     }
-  }, [isRunning, isSimulatorActive]);
+  }, [isRunning, isSimulatorActive, runTelemetry.isPaused]);
 
   const [latestConquest, setLatestConquest] = useState<ConquestYield | null>(DEFAULT_CONQUEST_YIELD);
   const [showConquestScreen, setShowConquestScreen] = useState<boolean>(false);
@@ -431,55 +455,96 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const stepSimulation = () => {
     audioService.playTick();
     simStepRef.current += 10;
+    const angle = (simStepRef.current % 100) * ((2 * Math.PI) / 100);
+    const simLat = baseLocationRef.current.lat + 0.0016 * Math.sin(angle);
+    const simLng = baseLocationRef.current.lng + 0.0022 * Math.cos(angle);
+    const newCoords = { lat: simLat, lng: simLng };
+    setUserLocation(newCoords);
+
     setRunTelemetry((prev) => {
-      const newDist = prev.distanceKm + 0.2;
-      const newProgress = Math.min(100, prev.loopProgressPct + 8);
-      const newSealDist = Math.max(0, prev.distanceToSealMeters - 30);
+      const trail = prev.gpsTrail || [];
+      const lastPt = trail[trail.length - 1] || newCoords;
+      const distDeltaKm = calculateDistanceKm(lastPt.lat, lastPt.lng, newCoords.lat, newCoords.lng);
+      const updatedTrail = [...trail, newCoords];
+      const newTotalDistKm = parseFloat((prev.distanceKm + distDeltaKm).toFixed(3));
+      const bearing = calculateBearing(lastPt.lat, lastPt.lng, newCoords.lat, newCoords.lng);
+      const dir = getCompassDirection(bearing);
+      const disp = calculateDisplacement(updatedTrail);
+
+      let areaYield = 0;
+      if (updatedTrail.length >= 3) {
+        const areaCalc = calculatePolygonArea([...updatedTrail, updatedTrail[0]]);
+        areaYield = areaCalc.areaKm2;
+      }
+
+      const loopProgress = Math.min(100, Math.round(simStepRef.current % 100));
+
       return {
         ...prev,
-        distanceKm: parseFloat(newDist.toFixed(2)),
-        loopProgressPct: Math.round(newProgress),
-        distanceToSealMeters: newSealDist,
+        distanceKm: newTotalDistKm,
+        gpsTrail: updatedTrail,
+        currentBearing: bearing,
+        currentDirection: dir,
+        displacementMeters: disp.meters,
+        distanceToSealMeters: disp.meters,
+        loopProgressPct: loopProgress,
+        estimatedTerritoryYield: areaYield,
       };
-    });
-    const angle = (simStepRef.current % 100) * (2 * Math.PI / 100);
-    setUserLocation({
-      lat: baseLocationRef.current.lat + 0.0025 * Math.sin(angle),
-      lng: baseLocationRef.current.lng + 0.0035 * Math.cos(angle),
     });
   };
 
-  // Live timer interval during active run with simulated movement
+  // Live timer interval during active run
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (isRunning && !runTelemetry.isPaused) {
       timerRef.current = window.setInterval(() => {
-        setRunTelemetry((prev) => {
-          const speedMultiplier = isSimulatorActive ? simulationSpeed : 1;
-          const newSeconds = prev.durationSeconds + speedMultiplier;
-          const newDist = prev.distanceKm + (0.003 * speedMultiplier);
-          const newProgress = Math.min(100, prev.loopProgressPct + (0.25 * speedMultiplier));
-          const newSealDist = Math.max(0, Math.round(prev.distanceToSealMeters - (1.2 * speedMultiplier)));
-          const newBpm = Math.min(178, Math.max(154, prev.bpm + (Math.random() > 0.6 ? 1 : Math.random() < 0.3 ? -1 : 0)));
+        // Increment timer by 1s
+        setRunTelemetry((prev) => ({
+          ...prev,
+          durationSeconds: prev.durationSeconds + 1,
+        }));
 
-          return {
-            ...prev,
-            durationSeconds: newSeconds,
-            distanceKm: parseFloat(newDist.toFixed(2)),
-            loopProgressPct: Math.round(newProgress),
-            distanceToSealMeters: newSealDist,
-            bpm: newBpm,
-          };
-        });
-
-        // Simulate moving marker around territory
+        // In simulator mode: advance runner along smooth athletic loop around userLocation
         if (isSimulatorActive) {
-          simStepRef.current += 0.5 * simulationSpeed;
-          const angle = (simStepRef.current % 100) * (2 * Math.PI / 100);
-          setUserLocation({
-            lat: baseLocationRef.current.lat + 0.0025 * Math.sin(angle),
-            lng: baseLocationRef.current.lng + 0.0035 * Math.cos(angle),
+          simStepRef.current += 1 * simulationSpeed;
+          const angle = (simStepRef.current % 100) * ((2 * Math.PI) / 100);
+          const simLat = baseLocationRef.current.lat + 0.0016 * Math.sin(angle);
+          const simLng = baseLocationRef.current.lng + 0.0022 * Math.cos(angle);
+          const simCoords = { lat: simLat, lng: simLng };
+          setUserLocation(simCoords);
+
+          setRunTelemetry((prev) => {
+            const trail = prev.gpsTrail || [];
+            const lastPt = trail[trail.length - 1] || simCoords;
+            const distDeltaKm = calculateDistanceKm(lastPt.lat, lastPt.lng, simCoords.lat, simCoords.lng);
+            const updatedTrail = [...trail, simCoords];
+            const newTotalDistKm = parseFloat((prev.distanceKm + distDeltaKm).toFixed(3));
+            const bearing = calculateBearing(lastPt.lat, lastPt.lng, simCoords.lat, simCoords.lng);
+            const dir = getCompassDirection(bearing);
+            const disp = calculateDisplacement(updatedTrail);
+
+            let areaYield = 0;
+            if (updatedTrail.length >= 3) {
+              const areaCalc = calculatePolygonArea([...updatedTrail, updatedTrail[0]]);
+              areaYield = areaCalc.areaKm2;
+            }
+
+            const loopProgress = Math.min(100, Math.round(simStepRef.current % 100));
+            const pace = newTotalDistKm > 0.02 ? Math.round(prev.durationSeconds / newTotalDistKm) : 0;
+
+            return {
+              ...prev,
+              distanceKm: newTotalDistKm,
+              gpsTrail: updatedTrail,
+              currentBearing: bearing,
+              currentDirection: dir,
+              displacementMeters: disp.meters,
+              distanceToSealMeters: disp.meters,
+              loopProgressPct: loopProgress,
+              estimatedTerritoryYield: areaYield,
+              paceSeconds: pace,
+            };
           });
         }
       }, 1000);
@@ -495,6 +560,23 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const startActivity = () => {
     audioService.playStart();
     setIsRunning(true);
+    setRunTelemetry({
+      distanceKm: 0.0,
+      durationSeconds: 0,
+      paceSeconds: 0,
+      estimatedTerritoryYield: 0.0,
+      loopProgressPct: 0,
+      distanceToSealMeters: 0,
+      displacementMeters: 0,
+      isPaused: false,
+      isLocked: false,
+      targetSyndicate: 'Campus Turf',
+      routePoints: [],
+      gpsTrail: userLocation ? [{ lat: userLocation.lat, lng: userLocation.lng }] : [],
+      currentBearing: undefined,
+      currentDirection: undefined,
+    });
+    lastTrackedLocationRef.current = userLocation;
     setCurrentTab('activity');
   };
 
@@ -526,39 +608,58 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     audioService.playVictoryFanfare();
     setIsRunning(false);
 
-    const captured = runTelemetry.estimatedTerritoryYield;
-    const oldDominance = currentUser?.territoryKm2 || 12.8;
-    const newDominance = parseFloat((oldDominance + captured).toFixed(2));
-    const newRank = Math.max(1, (currentUser?.localRank || 7) - 1);
+    let trail = [...(runTelemetry.gpsTrail || [])];
+    if (trail.length < 3) {
+      // If runner has fewer than 3 points, generate a minimal realistic loop at current coordinates
+      const { lat, lng } = userLocation;
+      trail = [
+        { lat: lat, lng: lng },
+        { lat: lat + 0.0008, lng: lng + 0.0006 },
+        { lat: lat + 0.0004, lng: lng + 0.0012 },
+        { lat: lat - 0.0003, lng: lng + 0.0007 },
+      ];
+    }
+
+    // Join the start and end points of the run (displacement / shortest distance) to form an enclosed polygon
+    const closedPolygon = [...trail, trail[0]];
+    const areaCalc = calculatePolygonArea(closedPolygon);
+    const disp = calculateDisplacement(trail);
+
+    const actualDistKm =
+      runTelemetry.distanceKm > 0.01
+        ? runTelemetry.distanceKm
+        : parseFloat((disp.km + 0.2).toFixed(2));
+    const actualDuration = runTelemetry.durationSeconds > 0 ? runTelemetry.durationSeconds : 120;
+    const paceSecs = actualDistKm > 0 ? Math.round(actualDuration / actualDistKm) : 320;
+    const paceMins = Math.floor(paceSecs / 60);
+    const paceRemSecs = paceSecs % 60;
+    const avgPaceString = `${paceMins}:${paceRemSecs.toString().padStart(2, '0')}`;
+
+    const oldDominance = currentUser?.territoryKm2 || 0;
+    const capturedKm2 = areaCalc.areaKm2 > 0 ? areaCalc.areaKm2 : 0.008;
+    const newDominance = parseFloat((oldDominance + capturedKm2).toFixed(3));
+    const newRank = Math.max(1, (currentUser?.localRank || 5) - 1);
+
+    const sectorName = currentUser?.city ? `${currentUser.city} Loop Territory` : 'Campus Turf Sector';
 
     const conquest: ConquestYield = {
-      sectorName: 'Sector 14',
-      capturedKm2: captured,
+      sectorName,
+      capturedKm2,
+      capturedM2: areaCalc.areaM2,
+      acresCaptured: areaCalc.acres,
       previousDominanceKm2: oldDominance,
       newDominanceKm2: newDominance,
-      rankSurgeTiers: 3,
-      previousRank: 9,
-      newRank: 6,
-      distanceKm: runTelemetry.distanceKm > 4 ? runTelemetry.distanceKm : 5.20,
-      durationSeconds: runTelemetry.durationSeconds > 1200 ? runTelemetry.durationSeconds : 1574,
-      avgPaceString: '5:02',
-      caloriesBurned: Math.round(runTelemetry.distanceKm * 75) || 412,
-      displacedRivals: [
-        {
-          username: '@ViperRun',
-          avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCFfxfOTV6ulrTlClYy3E5rzf45kFGUPyHf0PS3-BvU3FVzZqOHZ1EKf1xMfl1l7r1_XmFVkjBijA-xLhjp9m9q2QBSdw_CV8-W4BsFp87rV0CKR1VCM9fNG2rFgpSLcyfmn_67eFWnzJeMHmb6jrJfNMABHJeFtYySqhJdTToGejUUUCGW7sq0ATgplTr_5zHUbk4balALO0D4Rdh5RKOWjY1CS4DLd1qTpOmFXZ8mV7ajRqgTGcM',
-          note: 'Overtaken in Sector 14',
-          lostKm2: 0.81,
-        },
-        {
-          username: '@BlazeKicks',
-          avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBWIeX3c-fCANlCS3qez5vxHj6VzwaBFzYWuXO-9Ml8m88BzxrE9nm8Mhbsh8N4aDkXNl4QD1Q_b-v5GkKM8idD_9wR2YeL8rDqLq3TopMPXlXY6iqKkZyqWiW8W4imGq28ypvsuDLTyHsiwc6_ixX2qkHT2KvlYUsH04B3t9btBzEnhuHP7L1menIIhVZVFWwX1eiSqVRvOS8IPMo3Ll2g7sLH3st2B-xVBk41PmopPTzzC9WBzJw',
-          note: 'Overtaken in Sector 14',
-          lostKm2: 0.61,
-        },
-      ],
-      streakBonusXp: 350,
-      totalLootXp: 1280,
+      rankSurgeTiers: 1,
+      previousRank: currentUser?.localRank || 5,
+      newRank,
+      distanceKm: actualDistKm,
+      durationSeconds: actualDuration,
+      avgPaceString,
+      caloriesBurned: Math.max(15, Math.round(actualDistKm * 65)),
+      displacementMeters: disp.meters,
+      polygonPaths: closedPolygon,
+      rawGpsTrail: trail,
+      displacedRivals: [],
       timestamp: 'Just Now',
     };
 
@@ -581,17 +682,31 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         ...currentUser,
         territoryKm2: newDominance,
         localRank: newRank,
-        weeklyXp: currentUser.weeklyXp + 1280,
+        weeklyXp: currentUser.weeklyXp + 450,
         zonesHeld: currentUser.zonesHeld + 1,
       };
       setCurrentUser(updatedProfile);
       supabaseService.saveLocalSession(updatedProfile);
     }
 
-    // Update sector ownership in state
-    setSectors((prev) => [
-      ...prev.map((s) => (s.id === 'sec-doon' ? { ...s, isContested: false, owner: currentUser?.fullName || 'Alex Chen', ownerHandle: `${currentUser?.username || '@AlexRunner'} (YOU)`, ownerColor: '#2563EB', alertMessage: undefined } : s)),
-    ]);
+    // Add this real captured sector into `sectors` so it shows on the map right where the user ran!
+    const newSectorId = `claimed-${Date.now()}`;
+    const newSector: Sector = {
+      id: newSectorId,
+      code: `TURF-${Math.floor(Math.random() * 90 + 10)}`,
+      name: `Occupied Territory (+${capturedKm2} km²)`,
+      owner: currentUser?.fullName || 'Runner',
+      ownerHandle: `${currentUser?.username || '@Runner'} (YOU)`,
+      ownerColor: userTerritoryColor,
+      fillColor: hexToRgba(userTerritoryColor, 0.10),
+      areaKm2: capturedKm2,
+      points: '',
+      paths: closedPolygon,
+      centroid: trail[0],
+      isContested: false,
+    };
+
+    setSectors((prev) => [newSector, ...prev]);
   };
 
   const resetRun = () => {
@@ -599,16 +714,18 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setRunTelemetry({
       distanceKm: 0.0,
       durationSeconds: 0,
-      paceSeconds: 292,
-      bpm: 145,
-      spm: 168,
-      estimatedTerritoryYield: 1.42,
+      paceSeconds: 0,
+      estimatedTerritoryYield: 0.0,
       loopProgressPct: 0,
-      distanceToSealMeters: 450,
+      distanceToSealMeters: 0,
+      displacementMeters: 0,
       isPaused: false,
       isLocked: false,
-      targetSyndicate: 'Neon Syndicate HQ',
-      routePoints: [[68, 105]],
+      targetSyndicate: 'Campus Turf',
+      routePoints: [],
+      gpsTrail: [],
+      currentBearing: undefined,
+      currentDirection: undefined,
     });
   };
 
@@ -632,6 +749,8 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isAuthenticated,
         handleAuthSuccess,
         handleSignOut,
+        userTerritoryColor,
+        setUserTerritoryColor,
         isRunning,
         runTelemetry,
         startActivity,

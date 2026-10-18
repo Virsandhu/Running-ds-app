@@ -14,7 +14,7 @@ interface GoogleMapComponentProps {
   zoom?: number;
 }
 
-// Controller to smoothly pan/zoom camera when GPS updates
+// Controller to smoothly pan/zoom camera when GPS updates, clamped strictly to The Doon School
 const MapCameraController: React.FC<{
   center: { lat: number; lng: number };
   zoom: number;
@@ -23,12 +23,16 @@ const MapCameraController: React.FC<{
 
   useEffect(() => {
     if (!map) return;
-    map.panTo(center);
+    // Restrict camera to The Doon School estate (30.3296 - 30.3382 N, 78.0264 - 78.0366 E)
+    const clampedLat = Math.min(30.3380, Math.max(30.3298, center.lat));
+    const clampedLng = Math.min(78.0364, Math.max(78.0264, center.lng));
+    map.panTo({ lat: clampedLat, lng: clampedLng });
   }, [map, center.lat, center.lng]);
 
   useEffect(() => {
     if (!map) return;
-    map.setZoom(zoom);
+    const clampedZoom = Math.min(20, Math.max(16.0, zoom));
+    map.setZoom(clampedZoom);
   }, [map, zoom]);
 
   return null;
@@ -54,9 +58,10 @@ const AccuracyCircleOverlay: React.FC<{
       strokeOpacity: 0.65,
       strokeWeight: 1.5,
       fillColor,
-      fillOpacity: 0.12,
+      fillOpacity: 0.14,
       map,
       clickable: false,
+      zIndex: 9,
     });
 
     return () => {
@@ -75,6 +80,7 @@ const PolygonOverlay: React.FC<{
   strokeWeight?: number;
   strokeOpacity?: number;
   fillOpacity?: number;
+  zIndex?: number;
   onClick?: () => void;
 }> = ({
   paths,
@@ -83,6 +89,7 @@ const PolygonOverlay: React.FC<{
   strokeWeight = 2.5,
   strokeOpacity = 0.85,
   fillOpacity = 0.22,
+  zIndex = 5,
   onClick,
 }) => {
   const map = useMap();
@@ -98,6 +105,7 @@ const PolygonOverlay: React.FC<{
       strokeWeight,
       fillColor,
       fillOpacity,
+      zIndex,
       map,
       clickable: Boolean(onClick),
     });
@@ -111,17 +119,19 @@ const PolygonOverlay: React.FC<{
       if (listener) listener.remove();
       polygon.setMap(null);
     };
-  }, [map, mapsLib, paths, strokeColor, fillColor, strokeWeight, strokeOpacity, fillOpacity, onClick]);
+  }, [map, mapsLib, paths, strokeColor, fillColor, strokeWeight, strokeOpacity, fillOpacity, zIndex, onClick]);
 
   return null;
 };
 
-// Polyline Overlay for running route
+// Polyline Overlay for running route (dark black, slightly thin trail or highlight corridor)
 const PolylineOverlay: React.FC<{
   path: { lat: number; lng: number }[];
   strokeColor?: string;
   strokeWeight?: number;
-}> = ({ path, strokeColor = '#FC5200', strokeWeight = 5 }) => {
+  strokeOpacity?: number;
+  zIndex?: number;
+}> = ({ path, strokeColor = '#000000', strokeWeight = 2.8, strokeOpacity = 0.95, zIndex = 6 }) => {
   const map = useMap();
   const mapsLib = useMapsLibrary('maps');
 
@@ -131,15 +141,47 @@ const PolylineOverlay: React.FC<{
     const polyline = new mapsLib.Polyline({
       path,
       strokeColor,
-      strokeOpacity: 0.95,
+      strokeOpacity,
       strokeWeight,
+      zIndex,
       map,
     });
 
     return () => {
       polyline.setMap(null);
     };
-  }, [map, mapsLib, path, strokeColor, strokeWeight]);
+  }, [map, mapsLib, path, strokeColor, strokeWeight, strokeOpacity, zIndex]);
+
+  return null;
+};
+
+// Closing Line Overlay (joining start and end points: shortest distance / displacement)
+const ClosingLineOverlay: React.FC<{
+  start: { lat: number; lng: number };
+  end: { lat: number; lng: number };
+  strokeColor?: string;
+  strokeWeight?: number;
+  zIndex?: number;
+}> = ({ start, end, strokeColor = '#2563EB', strokeWeight = 2.5, zIndex = 8 }) => {
+  const map = useMap();
+  const mapsLib = useMapsLibrary('maps');
+
+  useEffect(() => {
+    if (!map || !mapsLib) return;
+
+    const polyline = new mapsLib.Polyline({
+      path: [start, end],
+      strokeColor,
+      strokeOpacity: 0.9,
+      strokeWeight,
+      zIndex,
+      map,
+    });
+
+    return () => {
+      polyline.setMap(null);
+    };
+  }, [map, mapsLib, start.lat, start.lng, end.lat, end.lng, strokeColor, strokeWeight, zIndex]);
 
   return null;
 };
@@ -149,54 +191,134 @@ const DOON_SCHOOL_LANDMARKS = [
   {
     id: 'doon-main',
     name: 'Main Building',
-    sub: 'Chandbagh Estate',
+    sub: 'Chandbagh Quadrangle',
     lat: 30.3340,
-    lng: 78.0305,
+    lng: 78.0310,
     icon: 'account_balance',
     color: 'bg-indigo-600',
   },
   {
     id: 'doon-rosebowl',
     name: 'Rose Bowl',
-    sub: 'Open Air Amphitheatre',
-    lat: 30.3346,
-    lng: 78.0315,
+    sub: 'Stone Amphitheatre',
+    lat: 30.3352,
+    lng: 78.0345,
     icon: 'theater_comedy',
     color: 'bg-rose-600',
   },
   {
     id: 'doon-skinners',
     name: "Skinner's Field",
-    sub: 'Athletics & Track',
-    lat: 30.3331,
-    lng: 78.0312,
+    sub: 'Athletics & Pavilion',
+    lat: 30.3326,
+    lng: 78.0336,
     icon: 'sprint',
     color: 'bg-emerald-600',
   },
   {
-    id: 'doon-gate',
+    id: 'doon-mall-gate',
     name: 'Mall Road Gate',
-    sub: 'Main Entrance',
-    lat: 30.3352,
-    lng: 78.0302,
+    sub: 'North Main Entrance',
+    lat: 30.3380,
+    lng: 78.0318,
     icon: 'door_front',
     color: 'bg-amber-600',
   },
+  {
+    id: 'doon-chakrata-gate',
+    name: 'Chakrata Gate',
+    sub: 'South Entrance',
+    lat: 30.3298,
+    lng: 78.0302,
+    icon: 'login',
+    color: 'bg-blue-600',
+  },
+  {
+    id: 'doon-houses',
+    name: 'Boarding Houses',
+    sub: 'Jaipur • Tata • Kashmir • Oberoi',
+    lat: 30.3348,
+    lng: 78.0272,
+    icon: 'villa',
+    color: 'bg-purple-600',
+  },
 ];
 
-// Precise 72-Acre Campus Boundary for The Doon School (Chandbagh Estate, Dehradun)
-const DOON_SCHOOL_CAMPUS_TERRITORY = [
-  { lat: 30.3356, lng: 78.0280 }, // Northwest Gate / Cantt link
-  { lat: 30.3354, lng: 78.0302 }, // Main Mall Road Entrance
-  { lat: 30.3351, lng: 78.0336 }, // Northeast corner (Mall Road East)
-  { lat: 30.3345, lng: 78.0345 }, // East boundary upper
-  { lat: 30.3330, lng: 78.0342 }, // East boundary lower near river trail
-  { lat: 30.3318, lng: 78.0335 }, // Southeast corner
-  { lat: 30.3320, lng: 78.0305 }, // South boundary (Pavilion & Gym)
-  { lat: 30.3322, lng: 78.0285 }, // Southwest corner near Chakrata link
-  { lat: 30.3338, lng: 78.0282 }, // West boundary
-  { lat: 30.3356, lng: 78.0280 }, // Closing loop back to Northwest
+// Outside Campus Inverted Mask: Solid opaque mask restricting visual display strictly to ONLY The Doon School
+const OutsideCampusMask: React.FC<{
+  campusBoundary: { lat: number; lng: number }[];
+}> = ({ campusBoundary }) => {
+  const map = useMap();
+  const mapsLib = useMapsLibrary('maps');
+
+  useEffect(() => {
+    if (!map || !mapsLib || campusBoundary.length < 3) return;
+
+    // Outer world ring with campusBoundary as inner cutout hole
+    const worldOuter = [
+      { lat: 85, lng: -180 },
+      { lat: 85, lng: 180 },
+      { lat: -85, lng: 180 },
+      { lat: -85, lng: -180 },
+    ];
+
+    const mask = new mapsLib.Polygon({
+      paths: [worldOuter, campusBoundary],
+      strokeColor: '#050811',
+      strokeOpacity: 1.0,
+      strokeWeight: 0,
+      fillColor: '#070B14',
+      fillOpacity: 1.0, // 100% solid: Restricts map visuals strictly to ONLY The Doon School
+      map,
+      clickable: false,
+      zIndex: 2,
+    });
+
+    return () => {
+      mask.setMap(null);
+    };
+  }, [map, mapsLib, campusBoundary]);
+
+  return null;
+};
+
+// Full Authentic 72-Acre Campus Perimeter Boundary for The Doon School (Chandbagh Estate, Dehradun)
+// Accurately calibrated to include all gates, residential boarding houses, athletics stadium, and estate walls
+export const DOON_SCHOOL_CAMPUS_TERRITORY = [
+  // Northwest Corner (Mall Road West & Cantt boundary link)
+  { lat: 30.3375, lng: 78.0264 },
+  // North Perimeter along Mall Road Wall
+  { lat: 30.3378, lng: 78.0282 },
+  { lat: 30.3382, lng: 78.0304 }, // Mall Road North Wall
+  { lat: 30.3380, lng: 78.0320 }, // Main Chandbagh Gate
+  { lat: 30.3375, lng: 78.0338 }, // North-East Mall Road approach
+  { lat: 30.3368, lng: 78.0355 }, // Northeast curve above Rose Bowl
+  // East Perimeter (Rose Bowl woodland, Art School, riverbank ridge)
+  { lat: 30.3358, lng: 78.0364 }, // Rose Bowl hillside & upper terrace
+  { lat: 30.3345, lng: 78.0366 }, // Eastern boundary ridge
+  { lat: 30.3332, lng: 78.0364 }, // Skinner's Field eastern boundary
+  { lat: 30.3318, lng: 78.0360 }, // Skinner's Field south-east corner
+  { lat: 30.3308, lng: 78.0348 }, // Southeast corner above riverbank
+  // South Perimeter (Lower sports grounds, Pavilion, Pool, Chakrata Road entrance)
+  { lat: 30.3300, lng: 78.0335 }, // Lower sports fields
+  { lat: 30.3296, lng: 78.0318 }, // South central boundary
+  { lat: 30.3298, lng: 78.0302 }, // Chakrata Road Gate
+  { lat: 30.3304, lng: 78.0286 }, // Southwest sports ground corner
+  // West Perimeter (Kashmir House, Oberoi House, Wellness center, Tata & Jaipur House)
+  { lat: 30.3312, lng: 78.0274 }, // Southwest wall
+  { lat: 30.3324, lng: 78.0266 }, // Kashmir House grounds
+  { lat: 30.3338, lng: 78.0264 }, // West central wall (Oberoi House)
+  { lat: 30.3352, lng: 78.0263 }, // Jaipur & Tata House wall
+  { lat: 30.3364, lng: 78.0264 }, // Northwest wall approach
+  { lat: 30.3375, lng: 78.0264 }, // Back to Northwest Corner
 ];
+
+export const DOON_SCHOOL_BOUNDS = {
+  north: 30.3400,
+  south: 30.3280,
+  west: 78.0240,
+  east: 78.0385,
+};
 
 export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
   className = '',
@@ -212,6 +334,7 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
     gpsAccuracy,
     startActivity,
     userTerritoryColor,
+    runTelemetry,
   } = useZoneRush();
 
   const [mapTypeId, setMapTypeId] = useState<string>('hybrid');
@@ -247,25 +370,34 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
         id="zonerush-map"
         mapId="DEMO_MAP_ID"
         internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
-        defaultCenter={userLocation}
-        defaultZoom={zoom}
+        defaultCenter={{ lat: 30.3340, lng: 78.0310 }}
+        defaultZoom={17.0}
+        minZoom={16.0}
+        maxZoom={20}
+        restriction={{
+          latLngBounds: DOON_SCHOOL_BOUNDS,
+          strictBounds: true,
+        }}
         mapTypeId={mapTypeId}
         gestureHandling="greedy"
         disableDefaultUI={true}
         className="w-full h-full"
       >
-        {/* Camera controller to center on real user location with high precision zoom */}
+        {/* Camera controller strictly locked over The Doon School */}
         <MapCameraController center={userLocation} zoom={zoomLevel || zoom} />
+
+        {/* Inverted Mask: Solid black/dark mask blocking out any area outside The Doon School */}
+        <OutsideCampusMask campusBoundary={DOON_SCHOOL_CAMPUS_TERRITORY} />
 
         {/* GPS Accuracy Radius Circle around Runner in User's Territory Color */}
         <AccuracyCircleOverlay
           center={userLocation}
-          radiusMeters={gpsAccuracy ? Math.min(gpsAccuracy, 45) : 20}
+          radiusMeters={gpsAccuracy ? Math.min(gpsAccuracy, 35) : 18}
           strokeColor={userTerritoryColor}
           fillColor={userTerritoryColor}
         />
 
-        {/* RUNNABLE CLAIMABLE ROADS OVERLAY: Highlighted with slight greyish styling */}
+        {/* RUNNABLE CLAIMABLE ROADS OVERLAY */}
         <RunnableRoadsOverlay
           roads={runnableRoads}
           selectedRoadId={selectedRoad?.id || null}
@@ -273,45 +405,53 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
           showHighlight={showRoadsHighlight}
         />
 
-        {/* Outer 72-Acre Campus Perimeter Boundary (Gold Accent Enclosure) */}
+        {/* The Doon School Campus Area (Shaded very lightly so all geographical features are clearly visible) */}
         <PolygonOverlay
           paths={DOON_SCHOOL_CAMPUS_TERRITORY}
-          strokeColor="#D97706"
-          fillColor="#000000"
-          strokeWeight={2}
-          strokeOpacity={0.85}
-          fillOpacity={0.03}
+          strokeColor="#F59E0B"
+          fillColor="#F59E0B"
+          strokeWeight={2.2}
+          strokeOpacity={0.75}
+          fillOpacity={0.04}
+          zIndex={3}
         />
 
-        {/* CAMPUS OCCUPIED SECTORS: Distinct Color For Every User */}
-        {sectors.map((sec) => (
-          <PolygonOverlay
-            key={`sector-poly-${sec.id}`}
-            paths={sec.paths || []}
-            strokeColor={sec.ownerColor}
-            fillColor={sec.ownerColor}
-            strokeWeight={2.5}
-            strokeOpacity={0.9}
-            fillOpacity={0.28}
-            onClick={() => setSelectedSector(sec)}
-          />
-        ))}
+        {/* CAMPUS OCCUPIED SECTORS: Distinct Color For Every User (Shaded very lightly so all campus features remain visible) */}
+        {sectors.map((sec) => {
+          const isUser = sec.ownerHandle.includes('(YOU)');
+          const color = isUser ? userTerritoryColor : sec.ownerColor;
+          return (
+            <PolygonOverlay
+              key={`sector-poly-${sec.id}`}
+              paths={sec.paths || []}
+              strokeColor={color}
+              fillColor={color}
+              strokeWeight={isUser ? 2 : 1.2}
+              strokeOpacity={0.65}
+              fillOpacity={isUser ? 0.10 : 0.06}
+              zIndex={isUser ? 4 : 3}
+              onClick={() => setSelectedSector(sec)}
+            />
+          );
+        })}
 
         {/* Occupied Sector Owner Badges with User-Specific Colors */}
         {sectors.map((sec) => {
           if (!sec.centroid) return null;
           const isUser = sec.ownerHandle.includes('(YOU)');
+          const color = isUser ? userTerritoryColor : sec.ownerColor;
 
           return (
             <AdvancedMarker
               key={`sector-tag-${sec.id}`}
               position={sec.centroid}
               onClick={() => setSelectedSector(sec)}
+              zIndex={11}
             >
               <div className="flex flex-col items-center cursor-pointer select-none group">
                 <div
                   className="px-2 py-0.5 rounded-full shadow-md text-white text-[9px] font-black uppercase tracking-tight flex items-center gap-1 border border-white/70 group-hover:scale-105 transition-transform backdrop-blur-xs"
-                  style={{ backgroundColor: sec.ownerColor }}
+                  style={{ backgroundColor: color }}
                   title={`${sec.name} • Occupied by ${sec.ownerHandle} (${sec.areaKm2} km²)`}
                 >
                   <span
@@ -322,7 +462,7 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                 </div>
                 <div
                   className="w-1.5 h-1.5 rotate-45 -mt-0.5 border-r border-b border-white/70"
-                  style={{ backgroundColor: sec.ownerColor }}
+                  style={{ backgroundColor: color }}
                 />
               </div>
             </AdvancedMarker>
@@ -330,7 +470,7 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
         })}
 
         {/* The Doon School Campus Main Title Badge */}
-        <AdvancedMarker position={{ lat: 30.3354, lng: 78.0302 }}>
+        <AdvancedMarker position={{ lat: 30.3380, lng: 78.0318 }} zIndex={12}>
           <div
             onClick={() => {
               const s = sectors[0];
@@ -341,16 +481,69 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
             <div className="bg-slate-950/95 border-2 border-amber-400 text-white px-2.5 py-0.5 rounded-full shadow-xl flex items-center gap-1.5 group-hover:scale-105 transition-transform backdrop-blur-xs">
               <span className="material-symbols-outlined text-amber-400 text-[14px]">school</span>
               <span className="text-[10px] font-black uppercase tracking-wider text-amber-300">
-                The Doon School (72 Acres)
+                The Doon School (Chandbagh Estate - 72 Acres)
               </span>
             </div>
             <div className="w-1.5 h-1.5 bg-slate-950 rotate-45 -mt-0.5 border-r-2 border-b-2 border-amber-400" />
           </div>
         </AdvancedMarker>
 
-        {/* Active Run Route Polyline (When on activity tab) */}
-        {currentTab === 'activity' && (
-          <PolylineOverlay path={dynamicRunRoute} strokeColor="#FC5200" strokeWeight={5} />
+        {/* USER COVERED AREA: Highlighted & Shaded Very Lightly in Chosen Territory Color */}
+        {/* 1. Translucent movement corridor shading along the covered path in chosen color */}
+        {runTelemetry?.gpsTrail && runTelemetry.gpsTrail.length >= 2 && (
+          <PolylineOverlay
+            path={runTelemetry.gpsTrail}
+            strokeColor={userTerritoryColor}
+            strokeWeight={12}
+            strokeOpacity={0.16}
+            zIndex={6}
+          />
+        )}
+
+        {/* 2. Real Live GPS Movement Trail: Dark black, slightly thin trail */}
+        {runTelemetry?.gpsTrail && runTelemetry.gpsTrail.length >= 2 && (
+          <PolylineOverlay
+            path={runTelemetry.gpsTrail}
+            strokeColor="#000000"
+            strokeWeight={2.2}
+            strokeOpacity={0.95}
+            zIndex={7}
+          />
+        )}
+
+        {/* 3. Real-time Closed Loop Covered Polygon Shaded Very Lightly in User's Chosen Color */}
+        {runTelemetry?.gpsTrail && runTelemetry.gpsTrail.length >= 3 && (
+          <PolygonOverlay
+            paths={[...runTelemetry.gpsTrail, runTelemetry.gpsTrail[0]]}
+            strokeColor={userTerritoryColor}
+            fillColor={userTerritoryColor}
+            strokeWeight={2.0}
+            strokeOpacity={0.75}
+            fillOpacity={0.10}
+            zIndex={5}
+          />
+        )}
+
+        {/* 4. Start Point Pin Marker */}
+        {runTelemetry?.gpsTrail && runTelemetry.gpsTrail.length >= 1 && (
+          <AdvancedMarker position={runTelemetry.gpsTrail[0]}>
+            <div className="flex flex-col items-center">
+              <div className="bg-emerald-600 text-white font-black text-[9px] px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-white">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                <span>START</span>
+              </div>
+              <div className="w-1.5 h-1.5 bg-emerald-600 rotate-45 -mt-0.5" />
+            </div>
+          </AdvancedMarker>
+        )}
+
+        {/* 5. Closing Line: Shortest distance between start and current/end point (Displacement) */}
+        {runTelemetry?.gpsTrail && runTelemetry.gpsTrail.length >= 2 && (
+          <ClosingLineOverlay
+            start={runTelemetry.gpsTrail[0]}
+            end={userLocation}
+            strokeColor="#2563EB"
+          />
         )}
 
         {/* Interactive Road Label Badges on Key Runnable Roads */}
@@ -433,12 +626,13 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                   style={{ backgroundColor: userTerritoryColor }}
                 />
               </div>
-              {/* Heading pointer */}
+              {/* Heading pointer oriented to real movement bearing */}
               <div
-                className="absolute -top-2 w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[6px]"
+                className="absolute -top-2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-b-[8px] transition-transform duration-300"
                 style={{
                   borderBottomColor: userTerritoryColor,
-                  transform: 'translateY(-2px)',
+                  transform: `translateY(-3px) rotate(${runTelemetry.currentBearing || 0}deg)`,
+                  transformOrigin: 'bottom center',
                 }}
               />
             </div>

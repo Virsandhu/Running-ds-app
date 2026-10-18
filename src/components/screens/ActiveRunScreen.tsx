@@ -84,7 +84,7 @@ export const ActiveRunScreen: React.FC = () => {
     <div className="flex-1 flex flex-col relative w-full pt-16 pb-24 bg-surface max-w-md mx-auto select-none">
       {/* Real Google Map Tracking Canvas */}
       <div className="relative w-full h-[395px] overflow-hidden bg-slate-100">
-        <GoogleMapComponent className="w-full h-full" zoom={15} />
+        <GoogleMapComponent className="w-full h-full" zoom={17} />
 
         {/* Top Floating Status Pill Strip */}
         <div className="absolute top-3 inset-x-3.5 flex flex-col gap-2 pointer-events-auto z-10">
@@ -158,10 +158,10 @@ export const ActiveRunScreen: React.FC = () => {
               </div>
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold tracking-wide uppercase text-slate-800 font-metric">
-                  LOOP DETECTOR
+                  LOOP CLOSURE
                 </span>
                 <span className="text-[11px] font-semibold text-blue-600 leading-tight">
-                  {runTelemetry.distanceToSealMeters}m to seal boundary
+                  {runTelemetry.displacementMeters}m displacement to start
                 </span>
               </div>
             </div>
@@ -179,7 +179,7 @@ export const ActiveRunScreen: React.FC = () => {
         <div className="absolute top-[148px] left-3.5 pointer-events-none flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 backdrop-blur-md shadow-sm border border-blue-200 z-10">
           <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
           <span className="text-[11px] font-metric font-bold text-blue-700 uppercase tracking-wider">
-            EST. TERRITORY: +{runTelemetry.estimatedTerritoryYield} KM²
+            EST. TERRITORY: +{runTelemetry.estimatedTerritoryYield.toFixed(3)} KM²
           </span>
         </div>
 
@@ -227,9 +227,19 @@ export const ActiveRunScreen: React.FC = () => {
                 KM
               </span>
             </div>
-            <div className="flex items-center gap-1 mt-1 text-emerald-600">
-              <span className="material-symbols-outlined text-[15px]">trending_up</span>
-              <span className="text-[11px] font-semibold">+0.62 km split</span>
+            <div className="flex items-center gap-1 mt-1 text-slate-700">
+              <span
+                className={`material-symbols-outlined text-[15px] ${
+                  runTelemetry.currentDirection ? 'text-emerald-600 animate-pulse' : 'text-slate-400'
+                }`}
+              >
+                {runTelemetry.currentDirection ? 'directions_run' : 'front_hand'}
+              </span>
+              <span className="text-[11px] font-semibold">
+                {runTelemetry.currentDirection
+                  ? `Moving ${runTelemetry.currentDirection} (${runTelemetry.currentBearing || 0}°)`
+                  : 'Stationary / Stopped'}
+              </span>
             </div>
           </div>
 
@@ -259,7 +269,7 @@ export const ActiveRunScreen: React.FC = () => {
           </div>
         </div>
 
-        {/* Secondary Metrics: Pace, Zone Claim, Heart Rate */}
+        {/* Secondary Metrics: Pace, Zone Claim, Movement Heading (No Vitals) */}
         <div className="grid grid-cols-3 gap-2">
           {/* Pace */}
           <div className="flex flex-col bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs">
@@ -267,7 +277,13 @@ export const ActiveRunScreen: React.FC = () => {
               PACE
             </span>
             <span className="font-metric text-[22px] font-bold text-slate-900 mt-0.5">
-              4:52
+              {runTelemetry.paceSeconds > 0
+                ? `${Math.floor(runTelemetry.paceSeconds / 60)}:${(
+                    runTelemetry.paceSeconds % 60
+                  )
+                    .toString()
+                    .padStart(2, '0')}`
+                : '--:--'}
             </span>
             <span className="text-[11px] text-slate-500 font-medium">/km avg</span>
           </div>
@@ -281,46 +297,47 @@ export const ActiveRunScreen: React.FC = () => {
               <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
             </div>
             <span className="font-metric text-[22px] font-bold text-blue-700 mt-0.5">
-              +{runTelemetry.estimatedTerritoryYield}
+              +{runTelemetry.estimatedTerritoryYield.toFixed(3)}
             </span>
             <span className="text-[11px] text-blue-600 font-semibold">km² preview</span>
           </div>
 
-          {/* Vitals (HR) */}
+          {/* Heading & Direction (Replaces Vitals) */}
           <div className="flex flex-col bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs">
-            <span className="text-[10px] font-metric uppercase font-bold text-rose-600 tracking-wider flex items-center gap-0.5">
-              <span
-                className="material-symbols-outlined text-[12px]"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                favorite
+            <span className="text-[10px] font-metric uppercase font-bold text-slate-500 tracking-wider flex items-center gap-1">
+              <span className="material-symbols-outlined text-[13px] text-[#FC5200]">
+                navigation
               </span>
-              VITALS
+              HEADING
             </span>
-            <span className="font-metric text-[22px] font-bold text-slate-900 mt-0.5">
-              {runTelemetry.bpm}
+            <span className="font-metric text-[22px] font-bold text-slate-900 mt-0.5 truncate">
+              {runTelemetry.currentDirection ? runTelemetry.currentDirection : 'STOPPED'}
             </span>
             <span className="text-[11px] text-slate-500 font-medium">
-              bpm • {runTelemetry.spm}spm
+              {typeof runTelemetry.currentBearing === 'number'
+                ? `${runTelemetry.currentBearing}° bearing`
+                : 'Awaiting move'}
             </span>
           </div>
         </div>
 
-        {/* Territorial Syndicate Status Bar */}
+        {/* Loop Closure & Displacement Bar */}
         <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-white border border-slate-200 shadow-xs">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-blue-600 text-[18px]">
-              verified_user
+              polyline
             </span>
             <span className="text-[12px] text-slate-600">
-              Target Syndicate:{' '}
+              Start-to-End Gap:{' '}
               <strong className="text-slate-900 font-bold">
-                {runTelemetry.targetSyndicate}
+                {runTelemetry.displacementMeters}m displacement
               </strong>
             </span>
           </div>
           <span className="text-[10px] font-metric font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full tracking-wider uppercase">
-            CONTESTING
+            {runTelemetry.displacementMeters < 35 && runTelemetry.distanceKm > 0.1
+              ? 'READY TO SEAL'
+              : 'TRAIL ACTIVE'}
           </span>
         </div>
 

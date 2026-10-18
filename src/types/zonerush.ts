@@ -34,8 +34,8 @@ export interface RunTelemetry {
   distanceKm: number;
   durationSeconds: number;
   paceSeconds: number; // seconds per km
-  bpm: number;
-  spm: number;
+  bpm?: number;
+  spm?: number;
   estimatedTerritoryYield: number;
   loopProgressPct: number;
   distanceToSealMeters: number;
@@ -43,11 +43,17 @@ export interface RunTelemetry {
   isLocked: boolean;
   targetSyndicate: string;
   routePoints: [number, number][];
+  gpsTrail: { lat: number; lng: number }[];
+  currentBearing?: number;
+  currentDirection?: string;
+  displacementMeters: number;
 }
 
 export interface ConquestYield {
   sectorName: string;
   capturedKm2: number;
+  capturedM2: number;
+  acresCaptured: number;
   previousDominanceKm2: number;
   newDominanceKm2: number;
   rankSurgeTiers: number;
@@ -57,14 +63,17 @@ export interface ConquestYield {
   durationSeconds: number;
   avgPaceString: string;
   caloriesBurned: number;
+  displacementMeters: number;
+  polygonPaths: { lat: number; lng: number }[];
+  rawGpsTrail: { lat: number; lng: number }[];
   displacedRivals: {
     username: string;
     avatarUrl: string;
     note: string;
     lostKm2: number;
   }[];
-  streakBonusXp: number;
-  totalLootXp: number;
+  streakBonusXp?: number;
+  totalLootXp?: number;
   timestamp: string;
 }
 
