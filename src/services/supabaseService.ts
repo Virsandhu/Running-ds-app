@@ -172,15 +172,14 @@ class SupabaseService {
             email: data.user.email || email,
             fullName: dbProfile?.full_name || data.user.user_metadata?.full_name || 'Alex Chen',
             username: dbProfile?.username || data.user.user_metadata?.username || '@AlexRunner',
-            city: dbProfile?.city || 'New York',
-            level: dbProfile?.level || 24,
-            territoryKm2: dbProfile?.territory_km2 || 12.8,
-            localRank: dbProfile?.local_rank || 7,
-            zonesHeld: dbProfile?.zones_held || 9,
-            weeklyXp: dbProfile?.weekly_xp || 4850,
-            streakDays: dbProfile?.streak_days || 14,
-            avatarUrl:
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuB4cnAh_eB0Xn3DbaM_wKpiKUbCpMQmRhwJc-4PG7YAtBY6OAUd4YHaLymaSlw-YUskAYQKoKh54TctIgWzPpcMErGMPHjFD3yCoR2LjJgFRPMYiMuWyw9_-ngJ3j0uFnBL2j9hJ4xNPkNOSqEQMUW73Set63WGQw-0oqd1WGOptvUZxpqA5cBdKFc5ktxObEh7TG6UjnrpXDV4-krPANwBocfxOvOEzegnzKoOwN0elCoaZB5XLck',
+            city: dbProfile?.city && !dbProfile.city.toLowerCase().includes('new york') ? dbProfile.city : 'The Doon School (Chandbagh)',
+            level: 1,
+            territoryKm2: dbProfile?.territory_km2 || 0.0,
+            localRank: dbProfile?.local_rank || 1,
+            zonesHeld: dbProfile?.zones_held || 0,
+            weeklyXp: dbProfile?.weekly_xp || 250,
+            streakDays: dbProfile?.streak_days || 1,
+            avatarUrl: dbProfile?.avatar_url || '⚡',
           };
           this.saveLocalSession(profile);
           return { profile, error: null };
@@ -193,24 +192,27 @@ class SupabaseService {
     // Check local session match or create valid session
     const existing = this.getLocalSession();
     if (existing && existing.email.toLowerCase() === email.toLowerCase()) {
+      if (existing.city && existing.city.toLowerCase().includes('new york')) {
+        existing.city = 'The Doon School (Chandbagh)';
+        this.saveLocalSession(existing);
+      }
       return { profile: existing, error: null };
     }
 
-    // Default runner account for quick testing
+    // Default runner account for testing
     const defaultProfile: UserRunnerProfile = {
       id: `usr_${Date.now()}`,
       email,
       fullName: 'Alex Chen',
       username: '@AlexRunner',
-      city: 'New York District',
-      level: 24,
-      territoryKm2: 12.8,
-      localRank: 7,
-      zonesHeld: 9,
-      weeklyXp: 4850,
-      streakDays: 14,
-      avatarUrl:
-        'https://lh3.googleusercontent.com/aida-public/AB6AXuB4cnAh_eB0Xn3DbaM_wKpiKUbCpMQmRhwJc-4PG7YAtBY6OAUd4YHaLymaSlw-YUskAYQKoKh54TctIgWzPpcMErGMPHjFD3yCoR2LjJgFRPMYiMuWyw9_-ngJ3j0uFnBL2j9hJ4xNPkNOSqEQMUW73Set63WGQw-0oqd1WGOptvUZxpqA5cBdKFc5ktxObEh7TG6UjnrpXDV4-krPANwBocfxOvOEzegnzKoOwN0elCoaZB5XLck',
+      city: 'The Doon School (Chandbagh)',
+      level: 1,
+      territoryKm2: 0.0,
+      localRank: 1,
+      zonesHeld: 0,
+      weeklyXp: 250,
+      streakDays: 1,
+      avatarUrl: '⚡',
     };
     this.saveLocalSession(defaultProfile);
     return { profile: defaultProfile, error: null };

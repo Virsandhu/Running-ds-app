@@ -278,14 +278,14 @@ export const ConquestScreen: React.FC = () => {
             {/* Mask strictly hiding anything outside The Doon School */}
             <ConquestMask />
 
-            {/* The Doon School Campus Area (Shaded very lightly so all geographical features are visible) */}
+            {/* The Entire Doon School Playable Running Area: Shaded under a very light shade of light blue */}
             <ConquestPolygon
               paths={DOON_SCHOOL_CAMPUS_TERRITORY}
-              strokeColor="#F59E0B"
-              fillColor="#F59E0B"
-              fillOpacity={0.04}
-              strokeWeight={1.8}
-              strokeOpacity={0.7}
+              strokeColor="#0284C7"
+              fillColor="#38BDF8"
+              fillOpacity={0.16}
+              strokeWeight={2.2}
+              strokeOpacity={0.85}
               zIndex={3}
             />
 

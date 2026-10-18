@@ -1,5 +1,6 @@
 import React from 'react';
 import { useZoneRush } from '../../context/ZoneRushContext';
+import { RunnerAvatar } from '../common/RunnerAvatar';
 
 interface TopHeaderProps {
   title?: string;
@@ -127,25 +128,17 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         )}
 
         {/* Right Section */}
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => setCurrentTab('profile')}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 active:scale-95 transition-all cursor-pointer"
-          >
-            <span className="font-metric text-[11px] text-slate-900 font-bold">
-              LVL {currentUser?.level ?? 1}
-            </span>
-          </button>
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setCurrentTab('profile')}
             className="relative flex items-center justify-center p-0.5 rounded-full ring-2 ring-[#FC5200]/30 hover:ring-[#FC5200] transition-all active:scale-95 cursor-pointer"
             aria-label="View Profile"
           >
-            <img
-              alt="Profile"
-              className="w-8 h-8 rounded-full object-cover"
-              src={currentUser?.avatarUrl || 'https://lh3.googleusercontent.com/aida-public/AB6AXuB4cnAh_eB0Xn3DbaM_wKpiKUbCpMQmRhwJc-4PG7YAtBY6OAUd4YHaLymaSlw-YUskAYQKoKh54TctIgWzPpcMErGMPHjFD3yCoR2LjJgFRPMYiMuWyw9_-ngJ3j0uFnBL2j9hJ4xNPkNOSqEQMUW73Set63WGQw-0oqd1WGOptvUZxpqA5cBdKFc5ktxObEh7TG6UjnrpXDV4-krPANwBocfxOvOEzegnzKoOwN0elCoaZB5XLck'}
-              referrerPolicy="no-referrer"
+            <RunnerAvatar
+              avatarUrl={currentUser?.avatarUrl}
+              name={currentUser?.fullName || 'Runner'}
+              sizeClassName="w-8 h-8"
+              textSizeClassName="text-base"
             />
           </button>
         </div>

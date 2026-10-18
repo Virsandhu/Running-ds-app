@@ -11,6 +11,8 @@ import {
   getCompassDirection,
   calculateDisplacement,
   calculatePolygonArea,
+  calculateRunningCalories,
+  doPolygonsOverlap,
 } from '../utils/geoUtils';
 
 interface ZoneRushContextType {
@@ -21,6 +23,7 @@ interface ZoneRushContextType {
   isAuthenticated: boolean;
   handleAuthSuccess: (profile: UserRunnerProfile) => void;
   handleSignOut: () => void;
+  updateUserAvatar: (avatarEmoji: string) => void;
   // Territory Colors
   userTerritoryColor: string;
   setUserTerritoryColor: (color: string) => void;
@@ -147,6 +150,14 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     if (currentUser) {
       const updated = { ...currentUser, territoryColor: color };
+      setCurrentUser(updated);
+      supabaseService.saveLocalSession(updated);
+    }
+  };
+
+  const updateUserAvatar = (avatarEmoji: string) => {
+    if (currentUser) {
+      const updated = { ...currentUser, avatarUrl: avatarEmoji };
       setCurrentUser(updated);
       supabaseService.saveLocalSession(updated);
     }
@@ -319,6 +330,9 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     currentDirection: undefined,
   });
 
+  // Device origin reference for real GPS delta mapping relative to Doon School
+  const initialDeviceCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
+
   // Auto-acquire position on mount and listen to movement continuously
   useEffect(() => {
     requestCurrentLocation();
@@ -345,12 +359,35 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
       const watchId = navigator.geolocation.watchPosition(
         (pos) => {
-          const newCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          const rawLat = pos.coords.latitude;
+          const rawLng = pos.coords.longitude;
           const acc = Math.round(pos.coords.accuracy);
-          setUserLocation(newCoords);
           setGpsAccuracy(acc);
           setGpsStatus('locked');
           setGpsErrorMessage(null);
+
+          // Check distance to The Doon School
+          const distToDoon = calculateDistanceKm(rawLat, rawLng, 30.3340, 78.0308);
+
+          // If physically within Doon School (or within 2 km), use raw GPS directly.
+          // If testing off-campus/remotely, map real device movement delta relative to Doon School campus
+          let newCoords: { lat: number; lng: number };
+          if (distToDoon <= 2.5) {
+            newCoords = { lat: rawLat, lng: rawLng };
+          } else {
+            // Store initial device reference if not yet set
+            if (!initialDeviceCoordsRef.current) {
+              initialDeviceCoordsRef.current = { lat: rawLat, lng: rawLng };
+            }
+            const dLat = rawLat - initialDeviceCoordsRef.current.lat;
+            const dLng = rawLng - initialDeviceCoordsRef.current.lng;
+            newCoords = {
+              lat: 30.3340 + dLat,
+              lng: 78.0308 + dLng,
+            };
+          }
+
+          setUserLocation(newCoords);
 
           // If actively running with real GPS, accurately track movement and append trail
           if (isRunning && !isSimulatorActive && !runTelemetry.isPaused) {
@@ -372,10 +409,14 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               );
               const distDeltaKm = distDeltaMeters / 1000;
 
-              // Filter out stationary jitter (< 2.5 meters) or wild GPS teleportation (> 600m)
-              if (distDeltaMeters < 2.5 || distDeltaKm > 0.6) {
-                // When stopped or jitter: trail stays right where user is, no distance added
-                return prev;
+              // Filter out stationary jitter (< 1.0 meter) or wild GPS teleportation (> 1200m)
+              if (distDeltaMeters < 1.0 || distDeltaKm > 1.2) {
+                // When stopped: trail stays right where user is, update heading if available
+                return {
+                  ...prev,
+                  currentDirection: pos.coords.heading ? getCompassDirection(pos.coords.heading) : prev.currentDirection,
+                  currentBearing: pos.coords.heading !== null && pos.coords.heading !== undefined ? Math.round(pos.coords.heading) : prev.currentBearing,
+                };
               }
 
               // Real movement confirmed: append to trail
@@ -385,7 +426,7 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               const dir = getCompassDirection(bearing);
               const disp = calculateDisplacement(updatedTrail);
 
-              // Calculate occupied area if loop were closed now
+              // Calculate occupied area if loop were closed now (joining start and end points)
               let areaYield = 0;
               if (updatedTrail.length >= 3) {
                 const areaCalc = calculatePolygonArea([...updatedTrail, updatedTrail[0]]);
@@ -394,7 +435,7 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
               // Loop progress calculation
               let loopProgress = 0;
-              if (newTotalDistKm > 0.08) {
+              if (newTotalDistKm > 0.05) {
                 loopProgress = Math.min(100, Math.max(10, Math.round((1 - Math.min(disp.meters, 250) / 250) * 100)));
               }
 
@@ -421,7 +462,7 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             setGpsStatus('denied');
           }
         },
-        { enableHighAccuracy: true, maximumAge: 2000, timeout: 25000 }
+        { enableHighAccuracy: true, maximumAge: 1500, timeout: 25000 }
       );
       return () => navigator.geolocation.clearWatch(watchId);
     }
@@ -559,6 +600,7 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const startActivity = () => {
     audioService.playStart();
+    initialDeviceCoordsRef.current = null;
     setIsRunning(true);
     setRunTelemetry({
       distanceKm: 0.0,
@@ -609,14 +651,19 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setIsRunning(false);
 
     let trail = [...(runTelemetry.gpsTrail || [])];
+    if (trail.length === 0) {
+      trail = [{ lat: userLocation.lat, lng: userLocation.lng }];
+    }
+
     if (trail.length < 3) {
-      // If runner has fewer than 3 points, generate a minimal realistic loop at current coordinates
-      const { lat, lng } = userLocation;
+      // If runner finished a short run, construct an accurate enclosing territory quad directly at the user's exact coordinates
+      const center = trail[0];
+      const end = trail[trail.length - 1];
       trail = [
-        { lat: lat, lng: lng },
-        { lat: lat + 0.0008, lng: lng + 0.0006 },
-        { lat: lat + 0.0004, lng: lng + 0.0012 },
-        { lat: lat - 0.0003, lng: lng + 0.0007 },
+        center,
+        { lat: center.lat + 0.00018, lng: center.lng - 0.00015 },
+        end,
+        { lat: end.lat - 0.00018, lng: end.lng + 0.00015 },
       ];
     }
 
@@ -640,7 +687,71 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const newDominance = parseFloat((oldDominance + capturedKm2).toFixed(3));
     const newRank = Math.max(1, (currentUser?.localRank || 5) - 1);
 
-    const sectorName = currentUser?.city ? `${currentUser.city} Loop Territory` : 'Campus Turf Sector';
+    // Accurately designate The Doon School campus territory (no remote cities)
+    const sectorName = 'The Doon School Campus Loop Territory';
+
+    // Scientifically accurate running calories calculated via ACSM metabolic equations
+    const caloriesBurned = calculateRunningCalories(actualDistKm, actualDuration);
+
+    // Overlap and displacement detection: check if new run loop overlaps territory held by other runners
+    const displacedRivals: {
+      username: string;
+      avatarUrl: string;
+      note: string;
+      lostKm2: number;
+    }[] = [];
+    const newSectorId = `claimed-${Date.now()}`;
+    const newSector: Sector = {
+      id: newSectorId,
+      code: `DOON-TURF-${Math.floor(Math.random() * 90 + 10)}`,
+      name: `Occupied Territory (+${capturedKm2} km²)`,
+      owner: currentUser?.fullName || 'Runner',
+      ownerHandle: `${currentUser?.username || '@Runner'} (YOU)`,
+      ownerColor: userTerritoryColor,
+      fillColor: hexToRgba(userTerritoryColor, 0.28),
+      areaKm2: capturedKm2,
+      points: '',
+      paths: closedPolygon,
+      centroid: trail[0],
+      isContested: false,
+    };
+
+    let hasOverlappedExisting = false;
+    setSectors((prev) => {
+      const updated = prev.map((sec) => {
+        if (sec.paths && sec.paths.length >= 3 && doPolygonsOverlap(closedPolygon, sec.paths)) {
+          hasOverlappedExisting = true;
+          const isOwn = sec.ownerHandle.includes('(YOU)') || sec.ownerHandle === currentUser?.username;
+          if (!isOwn && !displacedRivals.some((r) => r.username === sec.ownerHandle)) {
+            displacedRivals.push({
+              username: sec.ownerHandle,
+              avatarUrl: '🏃',
+              note: `Claimed by more recent run on ${sec.name || 'Campus Turf'}`,
+              lostKm2: sec.areaKm2 || capturedKm2,
+            });
+          }
+          // Territory claimed by more recent run: update ownership to runner X
+          return {
+            ...sec,
+            owner: currentUser?.fullName || 'Runner',
+            ownerHandle: `${currentUser?.username || '@Runner'} (YOU)`,
+            ownerColor: userTerritoryColor,
+            fillColor: hexToRgba(userTerritoryColor, 0.28),
+            paths: closedPolygon,
+            areaKm2: capturedKm2,
+            centroid: trail[0],
+            isContested: false,
+          };
+        }
+        return sec;
+      });
+
+      // If this is a newly claimed loop area, add it
+      if (!hasOverlappedExisting) {
+        return [newSector, ...updated];
+      }
+      return updated;
+    });
 
     const conquest: ConquestYield = {
       sectorName,
@@ -649,17 +760,17 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       acresCaptured: areaCalc.acres,
       previousDominanceKm2: oldDominance,
       newDominanceKm2: newDominance,
-      rankSurgeTiers: 1,
+      rankSurgeTiers: displacedRivals.length > 0 ? displacedRivals.length + 1 : 1,
       previousRank: currentUser?.localRank || 5,
       newRank,
       distanceKm: actualDistKm,
       durationSeconds: actualDuration,
       avgPaceString,
-      caloriesBurned: Math.max(15, Math.round(actualDistKm * 65)),
+      caloriesBurned,
       displacementMeters: disp.meters,
       polygonPaths: closedPolygon,
       rawGpsTrail: trail,
-      displacedRivals: [],
+      displacedRivals,
       timestamp: 'Just Now',
     };
 
@@ -688,25 +799,6 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setCurrentUser(updatedProfile);
       supabaseService.saveLocalSession(updatedProfile);
     }
-
-    // Add this real captured sector into `sectors` so it shows on the map right where the user ran!
-    const newSectorId = `claimed-${Date.now()}`;
-    const newSector: Sector = {
-      id: newSectorId,
-      code: `TURF-${Math.floor(Math.random() * 90 + 10)}`,
-      name: `Occupied Territory (+${capturedKm2} km²)`,
-      owner: currentUser?.fullName || 'Runner',
-      ownerHandle: `${currentUser?.username || '@Runner'} (YOU)`,
-      ownerColor: userTerritoryColor,
-      fillColor: hexToRgba(userTerritoryColor, 0.10),
-      areaKm2: capturedKm2,
-      points: '',
-      paths: closedPolygon,
-      centroid: trail[0],
-      isContested: false,
-    };
-
-    setSectors((prev) => [newSector, ...prev]);
   };
 
   const resetRun = () => {
@@ -749,6 +841,7 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isAuthenticated,
         handleAuthSuccess,
         handleSignOut,
+        updateUserAvatar,
         userTerritoryColor,
         setUserTerritoryColor,
         isRunning,

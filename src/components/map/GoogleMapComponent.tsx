@@ -405,18 +405,18 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
           showHighlight={showRoadsHighlight}
         />
 
-        {/* The Doon School Campus Area (Shaded very lightly so all geographical features are clearly visible) */}
+        {/* The Entire Doon School Playable Running Area: Shaded under a very light shade of light blue */}
         <PolygonOverlay
           paths={DOON_SCHOOL_CAMPUS_TERRITORY}
-          strokeColor="#F59E0B"
-          fillColor="#F59E0B"
-          strokeWeight={2.2}
-          strokeOpacity={0.75}
-          fillOpacity={0.04}
+          strokeColor="#0284C7"
+          fillColor="#38BDF8"
+          strokeWeight={2.5}
+          strokeOpacity={0.85}
+          fillOpacity={0.16}
           zIndex={3}
         />
 
-        {/* CAMPUS OCCUPIED SECTORS: Distinct Color For Every User (Shaded very lightly so all campus features remain visible) */}
+        {/* CAMPUS OCCUPIED SECTORS: Each runner's area covered by their run is in a different shade */}
         {sectors.map((sec) => {
           const isUser = sec.ownerHandle.includes('(YOU)');
           const color = isUser ? userTerritoryColor : sec.ownerColor;
@@ -426,10 +426,10 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
               paths={sec.paths || []}
               strokeColor={color}
               fillColor={color}
-              strokeWeight={isUser ? 2 : 1.2}
-              strokeOpacity={0.65}
-              fillOpacity={isUser ? 0.10 : 0.06}
-              zIndex={isUser ? 4 : 3}
+              strokeWeight={isUser ? 2.5 : 2.0}
+              strokeOpacity={0.9}
+              fillOpacity={isUser ? 0.32 : 0.25}
+              zIndex={isUser ? 5 : 4}
               onClick={() => setSelectedSector(sec)}
             />
           );
@@ -474,17 +474,32 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
           <div
             onClick={() => {
               const s = sectors[0];
-              if (s) setSelectedSector(s);
+              if (s) {
+                setSelectedSector(s);
+              } else {
+                setSelectedSector({
+                  id: 'doon-open-arena',
+                  code: 'DOON-OPEN',
+                  name: 'The Doon School (Chandbagh Campus)',
+                  owner: 'Unclaimed Playable Turf',
+                  ownerHandle: '@CampusOpen',
+                  ownerColor: '#0284C7',
+                  fillColor: 'rgba(56, 189, 248, 0.18)',
+                  areaKm2: 0.29,
+                  points: '',
+                  isContested: false,
+                });
+              }
             }}
             className="flex flex-col items-center cursor-pointer select-none group"
           >
-            <div className="bg-slate-950/95 border-2 border-amber-400 text-white px-2.5 py-0.5 rounded-full shadow-xl flex items-center gap-1.5 group-hover:scale-105 transition-transform backdrop-blur-xs">
-              <span className="material-symbols-outlined text-amber-400 text-[14px]">school</span>
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-300">
-                The Doon School (Chandbagh Estate - 72 Acres)
+            <div className="bg-slate-950/95 border-2 border-sky-400 text-white px-2.5 py-0.5 rounded-full shadow-xl flex items-center gap-1.5 group-hover:scale-105 transition-transform backdrop-blur-xs">
+              <span className="material-symbols-outlined text-sky-400 text-[14px]">school</span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-sky-200">
+                The Doon School (Playable Arena - 72 Acres)
               </span>
             </div>
-            <div className="w-1.5 h-1.5 bg-slate-950 rotate-45 -mt-0.5 border-r-2 border-b-2 border-amber-400" />
+            <div className="w-1.5 h-1.5 bg-slate-950 rotate-45 -mt-0.5 border-r-2 border-b-2 border-sky-400" />
           </div>
         </AdvancedMarker>
 

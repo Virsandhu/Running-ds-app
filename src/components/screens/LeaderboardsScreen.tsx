@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useZoneRush } from '../../context/ZoneRushContext';
 import { audioService } from '../../services/audioService';
 import { getUniqueUserColor } from '../../utils/userColors';
+import { RunnerAvatar } from '../common/RunnerAvatar';
 
 export const LeaderboardsScreen: React.FC = () => {
   const {
@@ -10,6 +11,7 @@ export const LeaderboardsScreen: React.FC = () => {
     setLeaderboardFilter,
     startActivity,
     userTerritoryColor,
+    currentUser,
   } = useZoneRush();
 
   const [challengeStatus, setChallengeStatus] = useState<string | null>(null);
@@ -289,11 +291,11 @@ export const LeaderboardsScreen: React.FC = () => {
                       #{runner.rank}
                     </div>
                     <div className="relative w-11 h-11 rounded-full p-0.5 bg-gradient-to-tr from-[#FC5200] to-amber-400 shrink-0">
-                      <img
-                        className="w-full h-full object-cover rounded-full bg-white"
-                        src={runner.avatarUrl}
-                        alt={runner.username}
-                        referrerPolicy="no-referrer"
+                      <RunnerAvatar
+                        avatarUrl={currentUser?.avatarUrl || runner.avatarUrl}
+                        name={runner.username}
+                        sizeClassName="w-full h-full"
+                        textSizeClassName="text-xl"
                       />
                       <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#FC5200] text-white flex items-center justify-center font-metric text-[9px] font-bold shadow-xs">
                         ★
@@ -341,11 +343,11 @@ export const LeaderboardsScreen: React.FC = () => {
                     #{runner.rank}
                   </div>
                   <div className="relative w-10 h-10 rounded-full overflow-hidden shrink-0 border border-slate-200">
-                    <img
-                      className="w-full h-full object-cover"
-                      src={runner.avatarUrl}
-                      alt={runner.username}
-                      referrerPolicy="no-referrer"
+                    <RunnerAvatar
+                      avatarUrl={runner.avatarUrl}
+                      name={runner.username}
+                      sizeClassName="w-full h-full"
+                      textSizeClassName="text-lg"
                     />
                   </div>
                   <div className="flex flex-col min-w-0">

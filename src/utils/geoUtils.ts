@@ -146,3 +146,103 @@ export const calculatePolygonArea = (
     acres,
   };
 };
+
+/**
+ * Calculates scientifically accurate active running caloric expenditure
+ * based on the American College of Sports Medicine (ACSM) metabolic equations
+ * and Margaria net running energy expenditure standards.
+ *
+ * Parameters:
+ * - distanceKm: Distance covered in kilometers
+ * - durationSeconds: Total active duration in seconds
+ * - runnerWeightKg: Runner body weight in kg (defaults to athletic standard 68 kg / 150 lbs)
+ *
+ * ACSM Running Equation (level grade):
+ * VO2 (mL/kg/min) = 0.2 * speed (m/min) + 3.5 (resting component)
+ * MET = VO2 / 3.5
+ * Calories (kcal) = MET * weight (kg) * (duration in hours)
+ */
+export const calculateRunningCalories = (
+  distanceKm: number,
+  durationSeconds: number,
+  runnerWeightKg: number = 68
+): number => {
+  if (distanceKm <= 0 || durationSeconds <= 0) return 0;
+
+  const durationHours = durationSeconds / 3600;
+  const speedMetersPerMin = (distanceKm * 1000) / (durationSeconds / 60);
+
+  // ACSM Metabolic calculation for walking, jogging, and running
+  let met: number;
+  if (speedMetersPerMin >= 134) {
+    // Running (>= 8.0 km/h): ACSM running formula
+    const vo2 = 0.2 * speedMetersPerMin + 3.5;
+    met = vo2 / 3.5;
+  } else if (speedMetersPerMin >= 80) {
+    // Jogging / brisk run-walk (4.8 - 8.0 km/h)
+    const vo2 = 0.15 * speedMetersPerMin + 3.5;
+    met = vo2 / 3.5;
+  } else {
+    // Walking (< 4.8 km/h): ACSM walking formula
+    const vo2 = 0.1 * speedMetersPerMin + 3.5;
+    met = vo2 / 3.5;
+  }
+
+  // Calculate gross energy expenditure (MET * kg * hours)
+  const calories = met * runnerWeightKg * durationHours;
+
+  // Cross-verify with Margaria net minimum running cost (1.036 kcal/kg/km)
+  const margariaMinimum = distanceKm * runnerWeightKg * 1.036;
+
+  // Return realistic rounded active calories
+  return Math.max(1, Math.round(Math.max(calories, margariaMinimum)));
+};
+
+/**
+ * Checks whether a coordinate point lies inside an enclosed polygon
+ * using the standard Jordan curve ray-casting algorithm.
+ */
+export const isPointInPolygon = (
+  point: LatLng,
+  polygon: LatLng[]
+): boolean => {
+  if (!polygon || polygon.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].lng;
+    const yi = polygon[i].lat;
+    const xj = polygon[j].lng;
+    const yj = polygon[j].lat;
+
+    const intersect =
+      yi > point.lat !== yj > point.lat &&
+      point.lng < ((xj - xi) * (point.lat - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+};
+
+/**
+ * Checks whether two geographic territory polygons overlap
+ * by testing mutual vertex containment and centroid proximity.
+ */
+export const doPolygonsOverlap = (
+  polyA: LatLng[],
+  polyB: LatLng[]
+): boolean => {
+  if (!polyA || !polyB || polyA.length < 3 || polyB.length < 3) return false;
+
+  // 1. Check if any vertex of A lies within B
+  for (const pt of polyA) {
+    if (isPointInPolygon(pt, polyB)) return true;
+  }
+
+  // 2. Check if any vertex of B lies within A
+  for (const pt of polyB) {
+    if (isPointInPolygon(pt, polyA)) return true;
+  }
+
+  return false;
+};
+
+

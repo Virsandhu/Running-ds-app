@@ -10,12 +10,12 @@ interface PresetLocation {
 }
 
 const PRESET_LOCATIONS: PresetLocation[] = [
-  { name: 'The Doon School (Chandbagh)', city: 'Dehradun, Uttarakhand, India', lat: 30.3340, lng: 78.0308 },
-  { name: 'Clock Tower / Rajpur Road', city: 'Dehradun, Uttarakhand, India', lat: 30.3256, lng: 78.0437 },
-  { name: 'Forest Research Institute (FRI)', city: 'Dehradun, Uttarakhand, India', lat: 30.3430, lng: 77.9995 },
-  { name: 'Central Park', city: 'New York, USA', lat: 40.7829, lng: -73.9654 },
-  { name: 'Embarcadero Pier', city: 'San Francisco, USA', lat: 37.7955, lng: -122.3937 },
-  { name: 'Hyde Park', city: 'London, UK', lat: 51.5074, lng: -0.1657 },
+  { name: 'The Doon School (Chandbagh Quad)', city: 'The Doon School, Dehradun', lat: 30.3340, lng: 78.0308 },
+  { name: "Skinner's Athletics Field & Track", city: 'The Doon School, Dehradun', lat: 30.3326, lng: 78.0344 },
+  { name: 'Rose Bowl Amphitheatre & Art School', city: 'The Doon School, Dehradun', lat: 30.3360, lng: 78.0345 },
+  { name: 'Chandbagh Main Gate (Mall Road)', city: 'The Doon School, Dehradun', lat: 30.3380, lng: 78.0320 },
+  { name: 'Lower Fields & Sports Pavilion', city: 'The Doon School, Dehradun', lat: 30.3304, lng: 78.0314 },
+  { name: 'Jaipur & Tata Boarding House Grounds', city: 'The Doon School, Dehradun', lat: 30.3350, lng: 78.0272 },
 ];
 
 export const GpsStatusModal: React.FC = () => {

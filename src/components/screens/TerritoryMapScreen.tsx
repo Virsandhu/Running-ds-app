@@ -125,24 +125,39 @@ export const TerritoryMapScreen: React.FC = () => {
         {/* The Doon School Campus Status Card */}
         <div className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
-              <span className="material-symbols-outlined text-[18px]">domain</span>
+            <div className="w-8 h-8 rounded-lg bg-sky-50 border border-sky-200 flex items-center justify-center text-sky-600">
+              <span className="material-symbols-outlined text-[18px]">sports_score</span>
             </div>
             <div className="flex flex-col">
               <span className="text-[13px] text-slate-900 font-bold leading-snug">
-                The Doon School Campus
+                The Doon School Playable Area
               </span>
               <span className="text-[11px] text-slate-500 font-medium">
-                Chandbagh Estate • 72 Acres
+                Light Blue Zone • Run to claim territory in your shade
               </span>
             </div>
           </div>
           <button
             type="button"
             onClick={() => {
-              if (sectors[0]) setSelectedSector(sectors[0]);
+              if (sectors[0]) {
+                setSelectedSector(sectors[0]);
+              } else {
+                setSelectedSector({
+                  id: 'doon-open-arena',
+                  code: 'DOON-OPEN',
+                  name: 'The Doon School (Chandbagh Campus)',
+                  owner: 'Unclaimed Playable Turf',
+                  ownerHandle: '@CampusOpen',
+                  ownerColor: '#0284C7',
+                  fillColor: 'rgba(56, 189, 248, 0.18)',
+                  areaKm2: 0.29,
+                  points: '',
+                  isContested: false,
+                });
+              }
             }}
-            className="px-3 py-1 rounded-full bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 font-metric text-[10px] font-extrabold uppercase tracking-wider transition-all cursor-pointer"
+            className="px-3 py-1 rounded-full bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-800 font-metric text-[10px] font-extrabold uppercase tracking-wider transition-all cursor-pointer"
           >
             Territory Info
           </button>

@@ -3,9 +3,17 @@ import { useZoneRush } from '../../context/ZoneRushContext';
 import { supabaseService } from '../../services/supabaseService';
 import { audioService } from '../../services/audioService';
 import { TERRITORY_PALETTE } from '../../utils/userColors';
+import { EMOJI_AVATAR_OPTIONS } from '../../utils/emojiAvatars';
+import { RunnerAvatar } from '../common/RunnerAvatar';
 
 export const ProfileScreen: React.FC = () => {
-  const { currentUser, handleSignOut, userTerritoryColor, setUserTerritoryColor } = useZoneRush();
+  const {
+    currentUser,
+    handleSignOut,
+    userTerritoryColor,
+    setUserTerritoryColor,
+    updateUserAvatar,
+  } = useZoneRush();
 
   const onLogout = () => {
     audioService.playTick();
@@ -19,15 +27,12 @@ export const ProfileScreen: React.FC = () => {
         <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200/90 p-5 shadow-sm flex flex-col gap-4">
           <div className="flex items-center gap-3.5">
             <div className="relative p-1 rounded-full ring-3 ring-[#FC5200]">
-              <img
-                src={currentUser?.avatarUrl || 'https://lh3.googleusercontent.com/aida-public/AB6AXuB4cnAh_eB0Xn3DbaM_wKpiKUbCpMQmRhwJc-4PG7YAtBY6OAUd4YHaLymaSlw-YUskAYQKoKh54TctIgWzPpcMErGMPHjFD3yCoR2LjJgFRPMYiMuWyw9_-ngJ3j0uFnBL2j9hJ4xNPkNOSqEQMUW73Set63WGQw-0oqd1WGOptvUZxpqA5cBdKFc5ktxObEh7TG6UjnrpXDV4-krPANwBocfxOvOEzegnzKoOwN0elCoaZB5XLck'}
-                alt={currentUser?.fullName || 'Runner'}
-                className="w-16 h-16 rounded-full object-cover"
-                referrerPolicy="no-referrer"
+              <RunnerAvatar
+                avatarUrl={currentUser?.avatarUrl}
+                name={currentUser?.fullName || 'Runner'}
+                sizeClassName="w-16 h-16"
+                textSizeClassName="text-3xl"
               />
-              <div className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-[#FC5200] text-white font-metric text-[10px] font-bold shadow-sm">
-                LVL {currentUser?.level ?? 1}
-              </div>
             </div>
 
             <div className="flex flex-col">
@@ -69,6 +74,56 @@ export const ProfileScreen: React.FC = () => {
             </div>
             <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-amber-400">
               <span className="material-symbols-outlined text-[22px]">domain</span>
+            </div>
+          </div>
+
+          {/* Preferred Profile Emoji Icon (10 Athletic Options) */}
+          <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xl leading-none">
+                  {currentUser?.avatarUrl && !currentUser.avatarUrl.startsWith('http')
+                    ? currentUser.avatarUrl
+                    : '⚡'}
+                </span>
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider font-sans">
+                  Profile Picture Emoji
+                </span>
+              </div>
+              <span className="text-[11px] font-bold text-slate-500 font-sans">
+                10 Athletic Icons
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-500 leading-relaxed font-sans">
+              Choose your athletic avatar emoji icon to represent you across The Doon School territory and leaderboards.
+            </p>
+
+            <div className="grid grid-cols-5 gap-2 pt-1">
+              {EMOJI_AVATAR_OPTIONS.map((opt) => {
+                const isSelected = currentUser?.avatarUrl === opt.emoji;
+                return (
+                  <button
+                    key={opt.name}
+                    type="button"
+                    onClick={() => {
+                      audioService.playTick();
+                      updateUserAvatar(opt.emoji);
+                    }}
+                    className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-white border-slate-900 shadow-sm scale-105 ring-2 ring-slate-900/10'
+                        : 'bg-white/60 border-slate-200/80 hover:bg-white hover:border-slate-300'
+                    }`}
+                    title={`${opt.name} - ${opt.description}`}
+                  >
+                    <span className="text-2xl leading-none">{opt.emoji}</span>
+                    <span className="text-[9px] font-bold text-slate-700 truncate max-w-full">
+                      {opt.name}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
