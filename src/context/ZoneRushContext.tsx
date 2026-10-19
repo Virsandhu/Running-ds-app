@@ -823,6 +823,9 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         sectorClaimed: conquest.sectorName,
         polygonPaths: conquest.polygonPaths,
         rawGpsTrail: conquest.rawGpsTrail,
+      }).then(({ profile }) => {
+        // Replace the optimistic local totals with the server-computed ones
+        if (profile) setCurrentUser(profile);
       });
 
       // Update active user profile

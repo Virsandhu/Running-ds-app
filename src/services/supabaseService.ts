@@ -34,6 +34,16 @@ interface ProfileRow {
   weekly_xp: number | null;
 }
 
+export interface AreaLeaderboardEntry {
+  id: string;
+  rank: number;
+  fullName: string;
+  username: string;
+  avatarUrl: string;
+  territoryColor: string;
+  territoryKm2: number;
+}
+
 const LOCAL_STORAGE_KEY = 'zonerush_active_user';
 
 class SupabaseService {
@@ -234,7 +244,7 @@ class SupabaseService {
     return { profile: null, error: 'No local runner profile found for this email. Create an account first.' };
   }
 
-  // Persist avatar / territory color changes to public.profiles
+  // Persist avatar / territory color changes to public.profiles (scores are server-computed)
   async updateProfile(
     profile: UserRunnerProfile,
     fields: { avatarUrl?: string; territoryColor?: string }
@@ -256,6 +266,33 @@ class SupabaseService {
     }
   }
 
+  // All runners ranked by total territory claimed; equal areas share a rank
+  async fetchAreaLeaderboard(): Promise<AreaLeaderboardEntry[] | null> {
+    if (!this.isConfigured || !this.client) {
+      return null;
+    }
+    const { data, error } = await this.client
+      .from('profiles')
+      .select('id, full_name, username, avatar_url, territory_color, territory_km2')
+      .order('territory_km2', { ascending: false })
+      .order('full_name', { ascending: true })
+      .limit(1000);
+    if (error) {
+      console.warn('Could not load leaderboard:', error.message);
+      return null;
+    }
+    return rankByArea(
+      data.map((row) => ({
+        id: row.id,
+        fullName: row.full_name,
+        username: row.username,
+        avatarUrl: row.avatar_url || '⚡',
+        territoryColor: row.territory_color || '#2563EB',
+        territoryKm2: Number(row.territory_km2 ?? 0),
+      }))
+    );
+  }
+
   async signOut(): Promise<void> {
     if (this.isConfigured && this.client) {
       await this.client.auth.signOut().catch(() => {});
@@ -263,7 +300,8 @@ class SupabaseService {
     this.clearLocalSession();
   }
 
-  // Save completed run loop into public.runs
+  // Save completed run loop into public.runs; the server validates it and recomputes
+  // distance, area and the runner's totals, then returns the refreshed profile
   async saveRunRecord(profile: UserRunnerProfile, runData: {
     distanceKm: number;
     durationSeconds: number;
@@ -274,9 +312,9 @@ class SupabaseService {
     sectorClaimed: string;
     polygonPaths: { lat: number; lng: number }[];
     rawGpsTrail: { lat: number; lng: number }[];
-  }) {
+  }): Promise<{ profile: UserRunnerProfile | null; error: string | null }> {
     if (!this.isConfigured || !this.client || this.isDemoProfile(profile)) {
-      return;
+      return { profile: null, error: null };
     }
     const { error } = await this.client.from('runs').insert({
       runner_id: profile.id,
@@ -291,9 +329,24 @@ class SupabaseService {
       raw_gps_trail: runData.rawGpsTrail,
     });
     if (error) {
-      console.warn('Could not save run to Supabase:', error.message);
+      console.warn('Run rejected by server:', error.message);
     }
+    return { profile: await this.getSessionProfile(), error: error?.message ?? null };
   }
+}
+
+// Sort by area (largest first) and assign competition ranks: 1, 2, 2, 4
+export function rankByArea(entries: Omit<AreaLeaderboardEntry, 'rank'>[]): AreaLeaderboardEntry[] {
+  const sorted = [...entries].sort(
+    (a, b) => b.territoryKm2 - a.territoryKm2 || a.fullName.localeCompare(b.fullName)
+  );
+  let rank = 0;
+  return sorted.map((entry, i) => {
+    if (i === 0 || entry.territoryKm2 !== sorted[i - 1].territoryKm2) {
+      rank = i + 1;
+    }
+    return { ...entry, rank };
+  });
 }
 
 export const supabaseService = new SupabaseService();

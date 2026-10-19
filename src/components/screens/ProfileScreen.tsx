@@ -5,6 +5,7 @@ import { audioService } from '../../services/audioService';
 import { TERRITORY_PALETTE } from '../../utils/userColors';
 import { EMOJI_AVATAR_OPTIONS } from '../../utils/emojiAvatars';
 import { RunnerAvatar } from '../common/RunnerAvatar';
+import { AreaLeaderboard } from '../profile/AreaLeaderboard';
 
 export const ProfileScreen: React.FC = () => {
   const {
@@ -196,6 +197,8 @@ export const ProfileScreen: React.FC = () => {
             </span>
           </div>
         </div>
+
+        <AreaLeaderboard />
 
         {/* Sign Out CTA */}
         <div className="pt-2">
