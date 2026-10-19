@@ -97,30 +97,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     onAuthSuccess({ ...pendingProfile, avatarUrl: selectedEmoji });
   };
 
-  const handleQuickDemoAccess = async () => {
-    setLoading(true);
-    audioService.playStart();
-    const demoProfile: UserRunnerProfile = {
-      id: 'demo_user_24',
-      email: 'alex.runner@zonerush.app',
-      fullName: 'Alex Chen',
-      username: '@AlexRunner',
-      city: 'The Doon School, Dehradun',
-      level: 1,
-      territoryKm2: 0.08,
-      localRank: 6,
-      zonesHeld: 1,
-      weeklyXp: 1250,
-      streakDays: 14,
-      avatarUrl: '⚡',
-    };
-    supabaseService.saveLocalSession(demoProfile);
-    setTimeout(() => {
-      onAuthSuccess(demoProfile);
-      setLoading(false);
-    }, 400);
-  };
-
   // STEP 2: Post-Signup Emoji Avatar Selection Modal / Screen
   if (showEmojiStep) {
     return (
@@ -334,20 +310,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
             )}
           </button>
         </form>
-
-        {/* Quick Demo Access Option */}
-        <div className="flex flex-col items-center gap-2 pt-2 border-t border-slate-100">
-          <span className="text-[11px] text-slate-400 font-sans">
-            Want to test immediately?
-          </span>
-          <button
-            type="button"
-            onClick={handleQuickDemoAccess}
-            className="px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-metric text-xs font-bold uppercase tracking-wider active:scale-95 transition-all cursor-pointer"
-          >
-            Launch with Demo Runner Dossier
-          </button>
-        </div>
       </div>
     </div>
   );

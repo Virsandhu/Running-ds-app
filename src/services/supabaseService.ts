@@ -44,6 +44,17 @@ export interface AreaLeaderboardEntry {
   territoryKm2: number;
 }
 
+export interface RunTerritory {
+  id: string;
+  runnerId: string;
+  fullName: string;
+  username: string;
+  territoryColor: string;
+  areaKm2: number;
+  createdAt: string;
+  trail: { lat: number; lng: number }[];
+}
+
 const LOCAL_STORAGE_KEY = 'zonerush_active_user';
 
 class SupabaseService {
@@ -94,10 +105,6 @@ class SupabaseService {
     } catch {
       // ignore
     }
-  }
-
-  isDemoProfile(profile: UserRunnerProfile | null): boolean {
-    return Boolean(profile?.id.startsWith('demo_'));
   }
 
   // Map a public.profiles row (or auth metadata when the row is missing) to the app profile
@@ -243,7 +250,7 @@ class SupabaseService {
     }
     return {
       profile: null,
-      error: 'Accounts are unavailable: this version of the app is not connected to Supabase. Use the demo runner, or create an offline account on this device.',
+      error: 'Accounts are unavailable: this version of the app is not connected to Supabase. Create an offline account on this device instead.',
     };
   }
 
@@ -253,7 +260,7 @@ class SupabaseService {
     fields: { avatarUrl?: string; territoryColor?: string }
   ): Promise<void> {
     this.saveLocalSession({ ...profile, ...fields });
-    if (!this.isConfigured || !this.client || this.isDemoProfile(profile)) {
+    if (!this.isConfigured || !this.client) {
       return;
     }
     const { error } = await this.client
@@ -296,6 +303,56 @@ class SupabaseService {
     );
   }
 
+  // Every saved run's exact GPS trail with its runner, oldest first
+  async fetchRunTerritories(): Promise<RunTerritory[] | null> {
+    if (!this.isConfigured || !this.client) {
+      return null;
+    }
+    const { data, error } = await this.client
+      .from('runs')
+      .select('id, runner_id, raw_gps_trail, territory_yield_km2, created_at, profiles(full_name, username, territory_color)')
+      .order('created_at', { ascending: true })
+      .limit(2000);
+    if (error) {
+      console.warn('Could not load run territories:', error.message);
+      return null;
+    }
+    return data
+      .filter((row) => Array.isArray(row.raw_gps_trail) && row.raw_gps_trail.length >= 3)
+      .map((row) => {
+        const runner = (Array.isArray(row.profiles) ? row.profiles[0] : row.profiles) as {
+          full_name: string;
+          username: string;
+          territory_color: string | null;
+        } | null;
+        return {
+          id: row.id,
+          runnerId: row.runner_id,
+          fullName: runner?.full_name || 'Runner',
+          username: runner?.username || '@Runner',
+          territoryColor: runner?.territory_color || '#2563EB',
+          areaKm2: Number(row.territory_yield_km2 ?? 0),
+          createdAt: row.created_at,
+          trail: row.raw_gps_trail as { lat: number; lng: number }[],
+        };
+      });
+  }
+
+  // Calls back whenever any runner saves a new run
+  onRunInserted(callback: () => void): () => void {
+    if (!this.isConfigured || !this.client) {
+      return () => {};
+    }
+    const client = this.client;
+    const channel = client
+      .channel('runs-feed')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'runs' }, callback)
+      .subscribe();
+    return () => {
+      client.removeChannel(channel);
+    };
+  }
+
   async signOut(): Promise<void> {
     if (this.isConfigured && this.client) {
       await this.client.auth.signOut().catch(() => {});
@@ -316,7 +373,7 @@ class SupabaseService {
     polygonPaths: { lat: number; lng: number }[];
     rawGpsTrail: { lat: number; lng: number }[];
   }): Promise<{ profile: UserRunnerProfile | null; error: string | null }> {
-    if (!this.isConfigured || !this.client || this.isDemoProfile(profile)) {
+    if (!this.isConfigured || !this.client) {
       return { profile: null, error: null };
     }
     const { error } = await this.client.from('runs').insert({

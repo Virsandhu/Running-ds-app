@@ -51,6 +51,7 @@ interface ZoneRushContextType {
   zoomLevel: number;
   setZoomLevel: React.Dispatch<React.SetStateAction<number>>;
   recenterMap: () => void;
+  recenterRequestedAt: number;
   // Live GPS Telemetry
   userLocation: { lat: number; lng: number };
   gpsStatus: 'searching' | 'locked' | 'denied' | 'unavailable';
@@ -93,20 +94,15 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Validate the cached profile against the real Supabase session and track sign-outs
   useEffect(() => {
     if (!supabaseService.isConfigured) return;
-    const cached = supabaseService.getLocalSession();
-    if (!supabaseService.isDemoProfile(cached)) {
-      supabaseService
-        .getSessionProfile()
-        .then((profile) => {
-          if (!profile) supabaseService.clearLocalSession();
-          setCurrentUser(profile);
-        })
-        .catch((err) => console.warn('Could not restore Supabase session:', err))
-        .finally(() => setIsRestoringSession(false));
-    }
-    return supabaseService.onSignedOut(() => {
-      setCurrentUser((prev) => (supabaseService.isDemoProfile(prev) ? prev : null));
-    });
+    supabaseService
+      .getSessionProfile()
+      .then((profile) => {
+        if (!profile) supabaseService.clearLocalSession();
+        setCurrentUser(profile);
+      })
+      .catch((err) => console.warn('Could not restore Supabase session:', err))
+      .finally(() => setIsRestoringSession(false));
+    return supabaseService.onSignedOut(() => setCurrentUser(null));
   }, []);
 
   // Distinct User Territory Color (Different for every user)
@@ -167,6 +163,42 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     );
   }, [userTerritoryColor]);
 
+  // Show every runner's saved run areas on the map, and refresh when anyone finishes a run
+  useEffect(() => {
+    if (!supabaseService.isConfigured || !currentUser) return;
+    const myId = currentUser.id;
+    const loadRunTerritories = () => {
+      supabaseService.fetchRunTerritories().then((runs) => {
+        if (!runs) return;
+        setSectors(
+          runs.map((run) => {
+            const isMine = run.runnerId === myId;
+            const centroid = {
+              lat: run.trail.reduce((sum, p) => sum + p.lat, 0) / run.trail.length,
+              lng: run.trail.reduce((sum, p) => sum + p.lng, 0) / run.trail.length,
+            };
+            return {
+              id: `run-${run.id}`,
+              code: new Date(run.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+              name: `${run.fullName}'s run`,
+              owner: run.fullName,
+              ownerHandle: isMine ? `${run.username} (YOU)` : run.username,
+              ownerColor: run.territoryColor,
+              fillColor: hexToRgba(run.territoryColor, 0.28),
+              areaKm2: run.areaKm2,
+              points: '',
+              paths: [...run.trail, run.trail[0]],
+              centroid,
+              isContested: false,
+            };
+          })
+        );
+      });
+    };
+    loadRunTerritories();
+    return supabaseService.onRunInserted(loadRunTerritories);
+  }, [currentUser?.id]);
+
   const setUserTerritoryColor = (color: string) => {
     setUserTerritoryColorState(color);
     try {
@@ -188,7 +220,9 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
   const [tacticalMode, setTacticalMode] = useState<boolean>(true);
-  const [zoomLevel, setZoomLevel] = useState<number>(18);
+  const [zoomLevel, setZoomLevel] = useState<number>(16);
+  // Time of the last explicit recenter; the map follows GPS briefly after it
+  const [recenterRequestedAt, setRecenterRequestedAt] = useState<number>(0);
   const [leaderboardFilter, setLeaderboardFilter] = useState<'nearby' | 'friends' | 'city' | 'weekly'>('nearby');
   const [leaderboard, setLeaderboard] = useState<LeaderboardRunner[]>(INITIAL_LEADERBOARD);
 
@@ -314,7 +348,8 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const setCustomLocation = (lat: number, lng: number, name?: string) => {
     setUserLocation({ lat, lng });
-    setZoomLevel(18);
+    setZoomLevel(17);
+    setRecenterRequestedAt(Date.now());
     setGpsStatus('locked');
     setGpsAccuracy(3);
     setGpsErrorMessage(null);
@@ -874,7 +909,8 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const recenterMap = () => {
     audioService.playTick();
-    setZoomLevel(18);
+    setZoomLevel(17);
+    setRecenterRequestedAt(Date.now());
     requestCurrentLocation();
   };
 
@@ -911,6 +947,7 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         zoomLevel,
         setZoomLevel,
         recenterMap,
+        recenterRequestedAt,
         userLocation,
         gpsStatus,
         gpsAccuracy,

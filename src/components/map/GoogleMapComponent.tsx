@@ -14,25 +14,29 @@ interface GoogleMapComponentProps {
   zoom?: number;
 }
 
-// Controller to smoothly pan/zoom camera when GPS updates, clamped strictly to The Doon School
+// How long after a recenter tap the camera keeps following GPS fixes
+const RECENTER_FOLLOW_MS = 10000;
+
+// Pans to the runner only while following (active run) or just after a recenter tap,
+// so the map can be scrolled freely the rest of the time
 const MapCameraController: React.FC<{
   center: { lat: number; lng: number };
   zoom: number;
-}> = ({ center, zoom }) => {
+  follow: boolean;
+  recenterRequestedAt: number;
+}> = ({ center, zoom, follow, recenterRequestedAt }) => {
   const map = useMap();
 
   useEffect(() => {
     if (!map) return;
-    // Restrict camera to The Doon School estate (30.3296 - 30.3382 N, 78.0264 - 78.0366 E)
-    const clampedLat = Math.min(30.3380, Math.max(30.3298, center.lat));
-    const clampedLng = Math.min(78.0364, Math.max(78.0264, center.lng));
-    map.panTo({ lat: clampedLat, lng: clampedLng });
-  }, [map, center.lat, center.lng]);
+    if (follow || Date.now() - recenterRequestedAt < RECENTER_FOLLOW_MS) {
+      map.panTo(center);
+    }
+  }, [map, center.lat, center.lng, follow, recenterRequestedAt]);
 
   useEffect(() => {
     if (!map) return;
-    const clampedZoom = Math.min(20, Math.max(16.0, zoom));
-    map.setZoom(clampedZoom);
+    map.setZoom(Math.min(20, Math.max(MIN_MAP_ZOOM, zoom)));
   }, [map, zoom]);
 
   return null;
@@ -244,7 +248,7 @@ const DOON_SCHOOL_LANDMARKS = [
   },
 ];
 
-// Outside Campus Inverted Mask: Solid opaque mask restricting visual display strictly to ONLY The Doon School
+// Outside Campus Inverted Mask: dims (but still shows) the surroundings so the campus stands out
 const OutsideCampusMask: React.FC<{
   campusBoundary: { lat: number; lng: number }[];
 }> = ({ campusBoundary }) => {
@@ -268,7 +272,7 @@ const OutsideCampusMask: React.FC<{
       strokeOpacity: 1.0,
       strokeWeight: 0,
       fillColor: '#070B14',
-      fillOpacity: 1.0, // 100% solid: Restricts map visuals strictly to ONLY The Doon School
+      fillOpacity: 0.45,
       map,
       clickable: false,
       zIndex: 2,
@@ -313,12 +317,15 @@ export const DOON_SCHOOL_CAMPUS_TERRITORY = [
   { lat: 30.3375, lng: 78.0264 }, // Back to Northwest Corner
 ];
 
+// Scrollable area: the campus plus a margin of the surrounding neighbourhood
 export const DOON_SCHOOL_BOUNDS = {
-  north: 30.3400,
-  south: 30.3280,
-  west: 78.0240,
-  east: 78.0385,
+  north: 30.3440,
+  south: 30.3240,
+  west: 78.0200,
+  east: 78.0430,
 };
+
+export const MIN_MAP_ZOOM = 15;
 
 export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
   className = '',
@@ -335,6 +342,7 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
     startActivity,
     userTerritoryColor,
     runTelemetry,
+    recenterRequestedAt,
   } = useZoneRush();
 
   const [mapTypeId, setMapTypeId] = useState<string>('hybrid');
@@ -371,8 +379,8 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
         mapId="DEMO_MAP_ID"
         internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
         defaultCenter={{ lat: 30.3340, lng: 78.0310 }}
-        defaultZoom={17.0}
-        minZoom={16.0}
+        defaultZoom={16}
+        minZoom={MIN_MAP_ZOOM}
         maxZoom={20}
         restriction={{
           latLngBounds: DOON_SCHOOL_BOUNDS,
@@ -384,9 +392,14 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
         className="w-full h-full"
       >
         {/* Camera controller strictly locked over The Doon School */}
-        <MapCameraController center={userLocation} zoom={zoomLevel || zoom} />
+        <MapCameraController
+          center={userLocation}
+          zoom={zoomLevel || zoom}
+          follow={currentTab === 'activity'}
+          recenterRequestedAt={recenterRequestedAt}
+        />
 
-        {/* Inverted Mask: Solid black/dark mask blocking out any area outside The Doon School */}
+        {/* Inverted Mask: dims the area outside The Doon School */}
         <OutsideCampusMask campusBoundary={DOON_SCHOOL_CAMPUS_TERRITORY} />
 
         {/* GPS Accuracy Radius Circle around Runner in User's Territory Color */}
@@ -405,14 +418,14 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
           showHighlight={showRoadsHighlight}
         />
 
-        {/* The Entire Doon School Playable Running Area: Shaded under a very light shade of light blue */}
+        {/* The Entire Doon School Playable Running Area: faint translucent tint so greenery and buildings show through */}
         <PolygonOverlay
           paths={DOON_SCHOOL_CAMPUS_TERRITORY}
-          strokeColor="#0284C7"
-          fillColor="#38BDF8"
-          strokeWeight={2.5}
-          strokeOpacity={0.85}
-          fillOpacity={0.16}
+          strokeColor="#7DD3FC"
+          fillColor="#BAE6FD"
+          strokeWeight={1.5}
+          strokeOpacity={0.6}
+          fillOpacity={0.06}
           zIndex={3}
         />
 

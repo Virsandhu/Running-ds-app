@@ -1,5 +1,6 @@
 import React from 'react';
 import { useZoneRush } from '../../context/ZoneRushContext';
+import { MIN_MAP_ZOOM } from './GoogleMapComponent';
 
 interface TacticalControlsProps {
   className?: string;
@@ -51,7 +52,7 @@ export const TacticalControls: React.FC<TacticalControlsProps> = ({ className = 
       <button
         type="button"
         aria-label="Zoom In"
-        onClick={() => setZoomLevel((z) => Math.min(21, (z || 18) + 1))}
+        onClick={() => setZoomLevel((z) => Math.min(20, (z || 16) + 1))}
         className="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-700 flex items-center justify-center shadow-sm active:scale-90 hover:bg-slate-50 transition-all cursor-pointer"
         title="Zoom In (Building / Track Level)"
       >
@@ -62,7 +63,7 @@ export const TacticalControls: React.FC<TacticalControlsProps> = ({ className = 
       <button
         type="button"
         aria-label="Zoom Out"
-        onClick={() => setZoomLevel((z) => Math.max(12, (z || 18) - 1))}
+        onClick={() => setZoomLevel((z) => Math.max(MIN_MAP_ZOOM, (z || 16) - 1))}
         className="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-700 flex items-center justify-center shadow-sm active:scale-90 hover:bg-slate-50 transition-all cursor-pointer"
         title="Zoom Out (City / Region Level)"
       >
