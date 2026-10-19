@@ -70,7 +70,7 @@ export const ProfileScreen: React.FC = () => {
                 The Doon School (Chandbagh)
               </span>
               <span className="text-[11px] text-slate-300">
-                72 Acres Estate • 0.29 km²
+                72 Acres
               </span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-amber-400">

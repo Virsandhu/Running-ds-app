@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sector } from '../../types/zonerush';
 import { useZoneRush } from '../../context/ZoneRushContext';
+import { formatSquareMetres } from '../../utils/units';
 
 interface SectorDetailModalProps {
   sector: Sector;
@@ -61,8 +62,8 @@ export const SectorDetailModal: React.FC<SectorDetailModalProps> = ({ sector, on
               Sector Area
             </span>
             <span className="font-metric text-xl font-extrabold text-slate-900">
-              {sector.areaKm2}{' '}
-              <span className="text-xs font-bold text-slate-500">km²</span>
+              {formatSquareMetres(sector.areaKm2)}{' '}
+              <span className="text-xs font-bold text-slate-500">m²</span>
             </span>
           </div>
           <div className="flex flex-col">

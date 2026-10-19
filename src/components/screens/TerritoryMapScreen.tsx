@@ -72,9 +72,6 @@ export const TerritoryMapScreen: React.FC = () => {
                 <span className="font-metric text-[16px] text-[#FC5200] font-bold">
                   Acres
                 </span>
-                <span className="text-[11px] text-slate-400 font-semibold ml-1">
-                  (0.29 km²)
-                </span>
               </div>
             </div>
 

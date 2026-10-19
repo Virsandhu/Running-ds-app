@@ -4,6 +4,7 @@ import { supabaseService, rankByArea, AreaLeaderboardEntry } from '../../service
 import { INITIAL_LEADERBOARD } from '../../data/mockData';
 import { getUniqueUserColor } from '../../utils/userColors';
 import { RunnerAvatar } from '../common/RunnerAvatar';
+import { formatSquareMetres } from '../../utils/units';
 
 const TOP_COUNT = 5;
 const MAX_SEARCH_RESULTS = 8;
@@ -37,8 +38,8 @@ const LeaderboardRow: React.FC<{ entry: AreaLeaderboardEntry; isYou: boolean }> 
     </div>
     <div className="flex items-center gap-1.5 shrink-0">
       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.territoryColor }} />
-      <span className="font-metric text-sm font-extrabold text-slate-900">{entry.territoryKm2.toFixed(3)}</span>
-      <span className="text-[10px] font-metric font-bold text-slate-500">km²</span>
+      <span className="font-metric text-sm font-extrabold text-slate-900">{formatSquareMetres(entry.territoryKm2)}</span>
+      <span className="text-[10px] font-metric font-bold text-slate-500">m²</span>
     </div>
   </div>
 );

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useZoneRush } from '../../context/ZoneRushContext';
 import { GoogleMapComponent } from '../map/GoogleMapComponent';
 import { audioService } from '../../services/audioService';
+import { formatMetres, formatSquareMetres, formatPacePer100m } from '../../utils/units';
 
 export const ActiveRunScreen: React.FC = () => {
   const {
@@ -185,7 +186,7 @@ export const ActiveRunScreen: React.FC = () => {
         <div className="absolute top-[148px] left-3.5 pointer-events-none flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 backdrop-blur-md shadow-sm border border-blue-200 z-10">
           <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
           <span className="text-[11px] font-metric font-bold text-blue-700 uppercase tracking-wider">
-            EST. TERRITORY: +{runTelemetry.estimatedTerritoryYield.toFixed(3)} KM²
+            EST. TERRITORY: +{formatSquareMetres(runTelemetry.estimatedTerritoryYield)} M²
           </span>
         </div>
 
@@ -227,10 +228,10 @@ export const ActiveRunScreen: React.FC = () => {
             </span>
             <div className="flex items-baseline gap-1 mt-0.5">
               <span className="font-metric text-[34px] leading-tight font-extrabold text-slate-900 tracking-tight">
-                {runTelemetry.distanceKm.toFixed(2)}
+                {formatMetres(runTelemetry.distanceKm)}
               </span>
               <span className="font-metric text-[14px] text-slate-600 font-bold uppercase">
-                KM
+                M
               </span>
             </div>
             <div className="flex items-center gap-1 mt-1 text-slate-700">
@@ -283,15 +284,9 @@ export const ActiveRunScreen: React.FC = () => {
               PACE
             </span>
             <span className="font-metric text-[22px] font-bold text-slate-900 mt-0.5">
-              {runTelemetry.paceSeconds > 0
-                ? `${Math.floor(runTelemetry.paceSeconds / 60)}:${(
-                    runTelemetry.paceSeconds % 60
-                  )
-                    .toString()
-                    .padStart(2, '0')}`
-                : '--:--'}
+              {runTelemetry.paceSeconds > 0 ? formatPacePer100m(runTelemetry.paceSeconds) : '--:--'}
             </span>
-            <span className="text-[11px] text-slate-500 font-medium">/km avg</span>
+            <span className="text-[11px] text-slate-500 font-medium">/100 m avg</span>
           </div>
 
           {/* Zone Claim */}
@@ -303,9 +298,9 @@ export const ActiveRunScreen: React.FC = () => {
               <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
             </div>
             <span className="font-metric text-[22px] font-bold text-blue-700 mt-0.5">
-              +{runTelemetry.estimatedTerritoryYield.toFixed(3)}
+              +{formatSquareMetres(runTelemetry.estimatedTerritoryYield)}
             </span>
-            <span className="text-[11px] text-blue-600 font-semibold">km² preview</span>
+            <span className="text-[11px] text-blue-600 font-semibold">m² preview</span>
           </div>
 
           {/* Heading & Direction (Replaces Vitals) */}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Map, AdvancedMarker, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
 import { useZoneRush } from '../../context/ZoneRushContext';
+import { formatMetres, formatSquareMetres, formatPacePer100m } from '../../utils/units';
 import { DOON_SCHOOL_BOUNDS, DOON_SCHOOL_CAMPUS_TERRITORY } from '../map/GoogleMapComponent';
 
 interface ConfettiPiece {
@@ -173,7 +174,7 @@ export const ConquestScreen: React.FC = () => {
       navigator
         .share({
           title: 'Territory Conquest Sealed - ZoneRush',
-          text: `I just captured territory (+${latestConquest?.capturedKm2 || 0.05} km²) on ZoneRush! Sealed loop displacement: ${latestConquest?.displacementMeters || 0}m.`,
+          text: `I just captured territory (+${formatSquareMetres(latestConquest?.capturedKm2 || 0)} m²) on ZoneRush! Sealed loop displacement: ${latestConquest?.displacementMeters || 0}m.`,
           url: window.location.href,
         })
         .catch(() => {});
@@ -395,19 +396,10 @@ export const ConquestScreen: React.FC = () => {
             </span>
             <div className="flex items-baseline justify-center gap-1.5">
               <span className="font-metric text-[40px] font-extrabold text-[#FC5200] tracking-tight">
-                +{latestConquest.capturedKm2}
+                +{formatSquareMetres(latestConquest.capturedKm2)}
               </span>
-              <span className="font-metric text-[22px] text-slate-700 uppercase font-bold">
-                km²
-              </span>
-            </div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[12px] font-sans">
-              <span className="font-semibold text-slate-800">
-                {latestConquest.capturedM2.toLocaleString()} m²
-              </span>
-              <span className="text-slate-400">•</span>
-              <span className="font-semibold text-slate-800">
-                {latestConquest.acresCaptured} Acres
+              <span className="font-metric text-[22px] text-slate-700 font-bold">
+                m²
               </span>
             </div>
           </div>
@@ -438,10 +430,10 @@ export const ConquestScreen: React.FC = () => {
                 Distance
               </span>
               <span className="font-metric text-[26px] text-slate-900 font-bold leading-tight mt-0.5">
-                {latestConquest.distanceKm.toFixed(2)}
+                {formatMetres(latestConquest.distanceKm)}
               </span>
               <span className="font-metric text-[10px] text-slate-400 uppercase font-medium">
-                Kilometers Ran
+                Metres Ran
               </span>
             </div>
 
@@ -462,10 +454,12 @@ export const ConquestScreen: React.FC = () => {
                 Avg Pace
               </span>
               <span className="font-metric text-[26px] text-slate-900 font-bold leading-tight mt-0.5">
-                {latestConquest.avgPaceString}
+                {latestConquest.distanceKm > 0
+                  ? formatPacePer100m(latestConquest.durationSeconds / latestConquest.distanceKm)
+                  : '--:--'}
               </span>
               <span className="font-metric text-[10px] text-slate-400 uppercase font-medium">
-                Min / Km
+                Min / 100 m
               </span>
             </div>
 

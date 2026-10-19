@@ -8,6 +8,7 @@ import {
 import { useZoneRush } from '../../context/ZoneRushContext';
 import { getRunnableRoads, RunnableRoad } from '../../data/runnableRoads';
 import { RunnableRoadsOverlay } from './RunnableRoadsOverlay';
+import { formatMetres, formatSquareMetres } from '../../utils/units';
 
 interface GoogleMapComponentProps {
   className?: string;
@@ -465,7 +466,7 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                 <div
                   className="px-2 py-0.5 rounded-full shadow-md text-white text-[9px] font-black uppercase tracking-tight flex items-center gap-1 border border-white/70 group-hover:scale-105 transition-transform backdrop-blur-xs"
                   style={{ backgroundColor: color }}
-                  title={`${sec.name} • Occupied by ${sec.ownerHandle} (${sec.areaKm2} km²)`}
+                  title={`${sec.name} • Occupied by ${sec.ownerHandle} (${formatSquareMetres(sec.areaKm2)} m²)`}
                 >
                   <span
                     className={`w-1.5 h-1.5 rounded-full bg-white ${isUser ? 'animate-ping' : ''}`}
@@ -593,7 +594,7 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                       ? 'bg-[#FC5200] text-white border-white scale-105 shadow-md'
                       : 'bg-slate-900/80 text-slate-200 border-slate-600/70 hover:bg-slate-900 hover:text-white backdrop-blur-xs'
                   }`}
-                  title={`${road.name} • ${road.distanceKm} km (Click to view claim yield)`}
+                  title={`${road.name} • ${formatMetres(road.distanceKm)} m (Click to view claim yield)`}
                 >
                   <span className="material-symbols-outlined text-[10px] text-slate-300">
                     {road.type === 'track' ? 'sprint' : 'alt_route'}
@@ -727,12 +728,12 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
             <div className="flex items-center gap-3">
               <div className="flex flex-col">
                 <span className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Distance</span>
-                <span className="text-xs font-black font-metric text-white">{selectedRoad.distanceKm} km</span>
+                <span className="text-xs font-black font-metric text-white">{formatMetres(selectedRoad.distanceKm)} m</span>
               </div>
               <div className="h-5 w-px bg-slate-800" />
               <div className="flex flex-col">
                 <span className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Turf Yield</span>
-                <span className="text-xs font-black font-metric text-emerald-400">+{selectedRoad.claimYieldKm2} km²</span>
+                <span className="text-xs font-black font-metric text-emerald-400">+{formatSquareMetres(selectedRoad.claimYieldKm2)} m²</span>
               </div>
             </div>
 
