@@ -21,6 +21,7 @@ const AppContent: React.FC = () => {
     showConquestScreen,
     closeConquestScreen,
     isAuthenticated,
+    isRestoringSession,
     handleAuthSuccess,
     isPermissionsModalOpen,
     setIsPermissionsModalOpen,
@@ -61,7 +62,13 @@ const AppContent: React.FC = () => {
   return (
     <>
       {/* Auth Gate: User must sign up / sign in first */}
-      {!isAuthenticated ? (
+      {isRestoringSession ? (
+        <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+          <span className="material-symbols-outlined text-[32px] text-[#FC5200] animate-spin">
+            progress_activity
+          </span>
+        </div>
+      ) : !isAuthenticated ? (
         <AuthScreen onAuthSuccess={handleAuthSuccess} />
       ) : showConquestScreen ? (
         <div className="min-h-screen bg-[#F8FAFC] flex flex-col text-[#0F172A]">

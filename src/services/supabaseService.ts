@@ -241,7 +241,10 @@ class SupabaseService {
     if (existing && existing.email.toLowerCase() === email.toLowerCase()) {
       return { profile: existing, error: null };
     }
-    return { profile: null, error: 'No local runner profile found for this email. Create an account first.' };
+    return {
+      profile: null,
+      error: 'Accounts are unavailable: this version of the app is not connected to Supabase. Use the demo runner, or create an offline account on this device.',
+    };
   }
 
   // Persist avatar / territory color changes to public.profiles (scores are server-computed)

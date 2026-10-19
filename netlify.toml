@@ -5,6 +5,9 @@
 [build.environment]
   NODE_VERSION = "22"
   NPM_FLAGS = "--legacy-peer-deps"
+  # Public by design (shipped in the browser bundle); data is protected by RLS
+  VITE_SUPABASE_URL = "https://nuukobcqzbsdwoqfouis.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im51dWtvYmNxemJzZHdvcWZvdWlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxMDkyNTksImV4cCI6MjEwNzY4NTI1OX0.FbvUZdpXHkm-3NydIRIk9jtAJhpMbbGf7zaF7a8FqJA"
 
 # Single-page app: serve index.html for every route
 [[redirects]]

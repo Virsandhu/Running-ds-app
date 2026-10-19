@@ -21,6 +21,7 @@ interface ZoneRushContextType {
   // User Authentication & Profile
   currentUser: UserRunnerProfile | null;
   isAuthenticated: boolean;
+  isRestoringSession: boolean;
   handleAuthSuccess: (profile: UserRunnerProfile) => void;
   handleSignOut: () => void;
   updateUserAvatar: (avatarEmoji: string) => void;
@@ -84,6 +85,10 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return supabaseService.getLocalSession();
   });
   const isAuthenticated = Boolean(currentUser);
+  // With no cached profile, hold the sign-in screen until the saved Supabase session is checked
+  const [isRestoringSession, setIsRestoringSession] = useState<boolean>(
+    () => supabaseService.isConfigured && !supabaseService.getLocalSession()
+  );
 
   // Validate the cached profile against the real Supabase session and track sign-outs
   useEffect(() => {
@@ -96,7 +101,8 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           if (!profile) supabaseService.clearLocalSession();
           setCurrentUser(profile);
         })
-        .catch((err) => console.warn('Could not restore Supabase session:', err));
+        .catch((err) => console.warn('Could not restore Supabase session:', err))
+        .finally(() => setIsRestoringSession(false));
     }
     return supabaseService.onSignedOut(() => {
       setCurrentUser((prev) => (supabaseService.isDemoProfile(prev) ? prev : null));
@@ -879,6 +885,7 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setCurrentTab,
         currentUser,
         isAuthenticated,
+        isRestoringSession,
         handleAuthSuccess,
         handleSignOut,
         updateUserAvatar,
