@@ -263,30 +263,35 @@ class SupabaseService {
     this.clearLocalSession();
   }
 
-  // Save completed run loop into Supabase
-  async saveRunRecord(profileId: string, runData: {
+  // Save completed run loop into public.runs
+  async saveRunRecord(profile: UserRunnerProfile, runData: {
     distanceKm: number;
     durationSeconds: number;
     avgPace: string;
     calories: number;
+    displacementMeters: number;
     territoryYieldKm2: number;
     sectorClaimed: string;
+    polygonPaths: { lat: number; lng: number }[];
+    rawGpsTrail: { lat: number; lng: number }[];
   }) {
-    if (this.isConfigured && this.client) {
-      try {
-        await this.client.from('run_activities').insert({
-          user_id: profileId,
-          distance_km: runData.distanceKm,
-          duration_seconds: runData.durationSeconds,
-          avg_pace: runData.avgPace,
-          calories_burned: runData.calories,
-          territory_yield_km2: runData.territoryYieldKm2,
-          sector_claimed: runData.sectorClaimed,
-          created_at: new Date().toISOString(),
-        });
-      } catch (err) {
-        console.warn('Could not save to Supabase runs table:', err);
-      }
+    if (!this.isConfigured || !this.client || this.isDemoProfile(profile)) {
+      return;
+    }
+    const { error } = await this.client.from('runs').insert({
+      runner_id: profile.id,
+      distance_km: runData.distanceKm,
+      duration_seconds: runData.durationSeconds,
+      avg_pace: runData.avgPace,
+      calories: runData.calories,
+      displacement_meters: runData.displacementMeters,
+      territory_yield_km2: runData.territoryYieldKm2,
+      sector_claimed: runData.sectorClaimed,
+      polygon_paths: runData.polygonPaths,
+      raw_gps_trail: runData.rawGpsTrail,
+    });
+    if (error) {
+      console.warn('Could not save run to Supabase:', error.message);
     }
   }
 }

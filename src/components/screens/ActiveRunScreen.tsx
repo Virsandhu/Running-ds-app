@@ -6,6 +6,9 @@ import { audioService } from '../../services/audioService';
 export const ActiveRunScreen: React.FC = () => {
   const {
     runTelemetry,
+    isRunning,
+    hasCompletedRunToday,
+    startActivity,
     togglePauseRun,
     sealLoopAndFinish,
     setLockState,
@@ -33,6 +36,9 @@ export const ActiveRunScreen: React.FC = () => {
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
   const maxSlide = 210;
+
+  // After today's run is sealed, the screen waits for a fresh run instead of the old one
+  const showNewRun = !isRunning && hasCompletedRunToday;
 
   const handleStartDrag = (clientX: number) => {
     isDraggingRef.current = true;
@@ -390,6 +396,29 @@ export const ActiveRunScreen: React.FC = () => {
           )}
         </div>
 
+        {showNewRun ? (
+          <div className="flex flex-col gap-2 pt-1">
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200">
+              <span className="material-symbols-outlined text-emerald-600 text-[18px]">task_alt</span>
+              <span className="text-[12px] text-emerald-800 font-semibold">
+                Run complete and territory sealed. Start a new run to claim fresh area.
+              </span>
+            </div>
+            <button
+              onClick={startActivity}
+              className="w-full h-14 rounded-full bg-[#FC5200] hover:bg-[#E04800] text-white flex items-center justify-center gap-2 px-5 shadow-md active:scale-98 transition-all font-metric text-[15px] font-bold uppercase tracking-wider cursor-pointer"
+            >
+              <span
+                className="material-symbols-outlined text-[22px]"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                directions_run
+              </span>
+              <span>NEW RUN</span>
+            </button>
+          </div>
+        ) : (
+        <>
         {/* Floating Athletic Action Buttons */}
         <div className="flex items-center gap-2.5 pt-1">
           {/* Strava Secondary Circular Pause Button */}
@@ -465,6 +494,8 @@ export const ActiveRunScreen: React.FC = () => {
             </span>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

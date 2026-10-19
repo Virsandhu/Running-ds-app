@@ -29,6 +29,7 @@ interface ZoneRushContextType {
   setUserTerritoryColor: (color: string) => void;
   // Run Telemetry & Controls
   isRunning: boolean;
+  hasCompletedRunToday: boolean;
   runTelemetry: RunTelemetry;
   startActivity: () => void;
   togglePauseRun: () => void;
@@ -327,6 +328,14 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Active Run State
   const [isRunning, setIsRunning] = useState<boolean>(false);
+  const [lastRunCompletedDate, setLastRunCompletedDate] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('zonerush_last_run_date');
+    } catch {
+      return null;
+    }
+  });
+  const hasCompletedRunToday = lastRunCompletedDate === new Date().toDateString();
   const [runTelemetry, setRunTelemetry] = useState<RunTelemetry>({
     distanceKm: 0.0,
     durationSeconds: 0,
@@ -617,6 +626,7 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const startActivity = () => {
     audioService.playStart();
     initialDeviceCoordsRef.current = null;
+    simStepRef.current = 0;
     setIsRunning(true);
     setRunTelemetry({
       distanceKm: 0.0,
@@ -793,15 +803,26 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setLatestConquest(conquest);
     setShowConquestScreen(true);
 
+    // Clear the finished run so the Activity screen offers a fresh "New Run"
+    resetRun();
+    const today = new Date().toDateString();
+    setLastRunCompletedDate(today);
+    try {
+      localStorage.setItem('zonerush_last_run_date', today);
+    } catch {}
+
     // Save run record to Supabase
     if (currentUser) {
-      supabaseService.saveRunRecord(currentUser.id, {
+      supabaseService.saveRunRecord(currentUser, {
         distanceKm: conquest.distanceKm,
         durationSeconds: conquest.durationSeconds,
         avgPace: conquest.avgPaceString,
         calories: conquest.caloriesBurned,
+        displacementMeters: conquest.displacementMeters,
         territoryYieldKm2: conquest.capturedKm2,
         sectorClaimed: conquest.sectorName,
+        polygonPaths: conquest.polygonPaths,
+        rawGpsTrail: conquest.rawGpsTrail,
       });
 
       // Update active user profile
@@ -861,6 +882,7 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         userTerritoryColor,
         setUserTerritoryColor,
         isRunning,
+        hasCompletedRunToday,
         runTelemetry,
         startActivity,
         togglePauseRun,
