@@ -201,6 +201,11 @@ DECLARE
 BEGIN
   clean_name := COALESCE(NEW.raw_user_meta_data->>'full_name', 'Runner');
   clean_handle := COALESCE(NEW.raw_user_meta_data->>'username', '@' || regexp_replace(clean_name, '\s+', '', 'g'));
+
+  -- Usernames are UNIQUE: suffix duplicates so a shared name never blocks sign-up
+  IF EXISTS (SELECT 1 FROM public.profiles WHERE username = clean_handle) THEN
+    clean_handle := clean_handle || '_' || substr(replace(NEW.id::text, '-', ''), 1, 5);
+  END IF;
   
   -- Assign deterministic unique color per runner
   color_index := 1 + (abs(hashtext(NEW.id::text)) % array_length(runner_colors, 1));
@@ -227,7 +232,7 @@ BEGIN
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Drop trigger if already exists and recreate
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;

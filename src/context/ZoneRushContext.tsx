@@ -84,6 +84,24 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
   const isAuthenticated = Boolean(currentUser);
 
+  // Validate the cached profile against the real Supabase session and track sign-outs
+  useEffect(() => {
+    if (!supabaseService.isConfigured) return;
+    const cached = supabaseService.getLocalSession();
+    if (!supabaseService.isDemoProfile(cached)) {
+      supabaseService
+        .getSessionProfile()
+        .then((profile) => {
+          if (!profile) supabaseService.clearLocalSession();
+          setCurrentUser(profile);
+        })
+        .catch((err) => console.warn('Could not restore Supabase session:', err));
+    }
+    return supabaseService.onSignedOut(() => {
+      setCurrentUser((prev) => (supabaseService.isDemoProfile(prev) ? prev : null));
+    });
+  }, []);
+
   // Distinct User Territory Color (Different for every user)
   const [userTerritoryColor, setUserTerritoryColorState] = useState<string>(() => {
     try {
@@ -149,17 +167,15 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch {}
 
     if (currentUser) {
-      const updated = { ...currentUser, territoryColor: color };
-      setCurrentUser(updated);
-      supabaseService.saveLocalSession(updated);
+      setCurrentUser({ ...currentUser, territoryColor: color });
+      supabaseService.updateProfile(currentUser, { territoryColor: color });
     }
   };
 
   const updateUserAvatar = (avatarEmoji: string) => {
     if (currentUser) {
-      const updated = { ...currentUser, avatarUrl: avatarEmoji };
-      setCurrentUser(updated);
-      supabaseService.saveLocalSession(updated);
+      setCurrentUser({ ...currentUser, avatarUrl: avatarEmoji });
+      supabaseService.updateProfile(currentUser, { avatarUrl: avatarEmoji });
     }
   };
 

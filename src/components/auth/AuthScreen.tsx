@@ -16,6 +16,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [infoMsg, setInfoMsg] = useState<string | null>(null);
 
   // Post-Signup Emoji Avatar Selection Step
   const [showEmojiStep, setShowEmojiStep] = useState(false);
@@ -25,6 +26,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+    setInfoMsg(null);
     setLoading(true);
 
     try {
@@ -47,6 +49,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
         if (res.error) {
           setErrorMsg(res.error);
           setLoading(false);
+          return;
+        }
+
+        if (res.needsEmailConfirmation) {
+          setInfoMsg(`Check ${email} for a confirmation link, then sign in.`);
+          setIsSignUp(false);
+          setPassword('');
           return;
         }
 
@@ -84,12 +93,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const handleConfirmEmoji = () => {
     if (!pendingProfile) return;
     audioService.playStart();
-    const updatedProfile: UserRunnerProfile = {
-      ...pendingProfile,
-      avatarUrl: selectedEmoji,
-    };
-    supabaseService.saveLocalSession(updatedProfile);
-    onAuthSuccess(updatedProfile);
+    supabaseService.updateProfile(pendingProfile, { avatarUrl: selectedEmoji });
+    onAuthSuccess({ ...pendingProfile, avatarUrl: selectedEmoji });
   };
 
   const handleQuickDemoAccess = async () => {
@@ -253,6 +258,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold flex items-center gap-2">
             <span className="material-symbols-outlined text-[18px]">error</span>
             <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {infoMsg && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-semibold flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px]">mark_email_read</span>
+            <span>{infoMsg}</span>
           </div>
         )}
 

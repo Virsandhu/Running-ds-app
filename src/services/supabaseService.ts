@@ -19,6 +19,21 @@ export interface UserRunnerProfile {
   territoryColor?: string;
 }
 
+// Row shape of public.profiles (see SUPABASE_BACKEND_SETUP_GUIDE.md)
+interface ProfileRow {
+  id: string;
+  email: string;
+  full_name: string;
+  username: string;
+  city: string | null;
+  avatar_url: string | null;
+  territory_color: string | null;
+  territory_km2: number | string | null;
+  local_rank: number | null;
+  zones_held: number | null;
+  weekly_xp: number | null;
+}
+
 const LOCAL_STORAGE_KEY = 'zonerush_active_user';
 
 class SupabaseService {
@@ -71,41 +86,88 @@ class SupabaseService {
     }
   }
 
-  // Sign up with Supabase or persistent local profile fallback
+  isDemoProfile(profile: UserRunnerProfile | null): boolean {
+    return Boolean(profile?.id.startsWith('demo_'));
+  }
+
+  // Map a public.profiles row (or auth metadata when the row is missing) to the app profile
+  private toRunnerProfile(user: User, row: ProfileRow | null): UserRunnerProfile {
+    const meta = user.user_metadata || {};
+    return {
+      id: user.id,
+      email: row?.email || user.email || '',
+      fullName: row?.full_name || meta.full_name || 'Runner',
+      username: row?.username || meta.username || '@Runner',
+      city: row?.city || meta.city || 'The Doon School, Dehradun',
+      level: 1,
+      territoryKm2: Number(row?.territory_km2 ?? 0),
+      localRank: row?.local_rank ?? 10,
+      zonesHeld: row?.zones_held ?? 0,
+      weeklyXp: row?.weekly_xp ?? 0,
+      streakDays: 1,
+      avatarUrl: row?.avatar_url || meta.avatar_url || '⚡',
+      territoryColor: row?.territory_color || undefined,
+    };
+  }
+
+  private async fetchProfile(user: User): Promise<UserRunnerProfile> {
+    const { data: row, error } = await this.client!
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle<ProfileRow>();
+    if (error) {
+      console.warn('Could not load runner profile:', error.message);
+    }
+    const profile = this.toRunnerProfile(user, row ?? null);
+    this.saveLocalSession(profile);
+    return profile;
+  }
+
+  // Restore the signed-in runner from the persisted Supabase session
+  async getSessionProfile(): Promise<UserRunnerProfile | null> {
+    if (!this.isConfigured || !this.client) {
+      return this.getLocalSession();
+    }
+    const { data } = await this.client.auth.getSession();
+    if (!data.session) {
+      return null;
+    }
+    return this.fetchProfile(data.session.user);
+  }
+
+  // Notifies when the Supabase session ends (sign-out elsewhere, expired refresh token)
+  onSignedOut(callback: () => void): () => void {
+    if (!this.isConfigured || !this.client) {
+      return () => {};
+    }
+    const { data } = this.client.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        callback();
+      }
+    });
+    return () => data.subscription.unsubscribe();
+  }
+
+  // Sign up with Supabase, or a local profile when Supabase is not configured
   async signUp(
     email: string,
     password: string,
     metadata: { fullName: string; username: string; city: string; experienceLevel?: string }
-  ): Promise<{ profile: UserRunnerProfile | null; error: string | null }> {
-    const avatarNumber = Math.floor(Math.random() * 8) + 1;
-    const defaultAvatar = `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`;
-
-    const userProfile: UserRunnerProfile = {
-      id: `usr_${Date.now()}`,
-      email,
-      fullName: metadata.fullName || 'Runner',
-      username: metadata.username.startsWith('@') ? metadata.username : `@${metadata.username}`,
-      city: metadata.city || 'District Central',
-      level: 1,
-      territoryKm2: 0.0,
-      localRank: 12,
-      zonesHeld: 0,
-      weeklyXp: 250,
-      streakDays: 1,
-      avatarUrl:
-        'https://lh3.googleusercontent.com/aida-public/AB6AXuB4cnAh_eB0Xn3DbaM_wKpiKUbCpMQmRhwJc-4PG7YAtBY6OAUd4YHaLymaSlw-YUskAYQKoKh54TctIgWzPpcMErGMPHjFD3yCoR2LjJgFRPMYiMuWyw9_-ngJ3j0uFnBL2j9hJ4xNPkNOSqEQMUW73Set63WGQw-0oqd1WGOptvUZxpqA5cBdKFc5ktxObEh7TG6UjnrpXDV4-krPANwBocfxOvOEzegnzKoOwN0elCoaZB5XLck',
-    };
+  ): Promise<{ profile: UserRunnerProfile | null; error: string | null; needsEmailConfirmation?: boolean }> {
+    const username = metadata.username.startsWith('@') ? metadata.username : `@${metadata.username}`;
 
     if (this.isConfigured && this.client) {
       try {
+        // The on_auth_user_created trigger creates the public.profiles row from this metadata
         const { data, error } = await this.client.auth.signUp({
           email,
           password,
           options: {
             data: {
               full_name: metadata.fullName,
-              username: userProfile.username,
-              city: userProfile.city,
+              username,
+              city: metadata.city,
             },
           },
         });
@@ -113,37 +175,38 @@ class SupabaseService {
         if (error) {
           return { profile: null, error: error.message };
         }
-
-        if (data.user) {
-          userProfile.id = data.user.id;
-          try {
-            await this.client
-              .from('profiles')
-              .upsert({
-                id: data.user.id,
-                email,
-                full_name: metadata.fullName,
-                username: userProfile.username,
-                city: metadata.city,
-                territory_km2: 0.0,
-                level: 1,
-                weekly_xp: 250,
-                updated_at: new Date().toISOString(),
-              });
-          } catch {
-            // ignore table creation check
-          }
+        if (!data.user) {
+          return { profile: null, error: 'Sign-up failed. Please try again.' };
         }
+        // Email confirmation is enabled: no session until the link is clicked
+        if (!data.session) {
+          return { profile: null, error: null, needsEmailConfirmation: true };
+        }
+        return { profile: await this.fetchProfile(data.user), error: null };
       } catch (err: unknown) {
-        console.warn('Supabase remote sign-up notice, utilizing validated local account:', err);
+        return { profile: null, error: err instanceof Error ? err.message : 'Could not reach Supabase.' };
       }
     }
 
+    const userProfile: UserRunnerProfile = {
+      id: `usr_${Date.now()}`,
+      email,
+      fullName: metadata.fullName || 'Runner',
+      username,
+      city: metadata.city || 'The Doon School, Dehradun',
+      level: 1,
+      territoryKm2: 0.0,
+      localRank: 12,
+      zonesHeld: 0,
+      weeklyXp: 250,
+      streakDays: 1,
+      avatarUrl: '⚡',
+    };
     this.saveLocalSession(userProfile);
     return { profile: userProfile, error: null };
   }
 
-  // Sign in with Supabase
+  // Sign in with Supabase, or the local profile when Supabase is not configured
   async signIn(
     email: string,
     password: string
@@ -158,64 +221,39 @@ class SupabaseService {
         if (error) {
           return { profile: null, error: error.message };
         }
-
-        if (data.user) {
-          // Fetch existing profile or create default
-          const { data: dbProfile } = await this.client
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
-
-          const profile: UserRunnerProfile = {
-            id: data.user.id,
-            email: data.user.email || email,
-            fullName: dbProfile?.full_name || data.user.user_metadata?.full_name || 'Alex Chen',
-            username: dbProfile?.username || data.user.user_metadata?.username || '@AlexRunner',
-            city: dbProfile?.city && !dbProfile.city.toLowerCase().includes('new york') ? dbProfile.city : 'The Doon School (Chandbagh)',
-            level: 1,
-            territoryKm2: dbProfile?.territory_km2 || 0.0,
-            localRank: dbProfile?.local_rank || 1,
-            zonesHeld: dbProfile?.zones_held || 0,
-            weeklyXp: dbProfile?.weekly_xp || 250,
-            streakDays: dbProfile?.streak_days || 1,
-            avatarUrl: dbProfile?.avatar_url || '⚡',
-          };
-          this.saveLocalSession(profile);
-          return { profile, error: null };
-        }
+        return { profile: await this.fetchProfile(data.user), error: null };
       } catch (err: unknown) {
-        console.warn('Supabase sign-in network error:', err);
+        return { profile: null, error: err instanceof Error ? err.message : 'Could not reach Supabase.' };
       }
     }
 
-    // Check local session match or create valid session
     const existing = this.getLocalSession();
     if (existing && existing.email.toLowerCase() === email.toLowerCase()) {
-      if (existing.city && existing.city.toLowerCase().includes('new york')) {
-        existing.city = 'The Doon School (Chandbagh)';
-        this.saveLocalSession(existing);
-      }
       return { profile: existing, error: null };
     }
+    return { profile: null, error: 'No local runner profile found for this email. Create an account first.' };
+  }
 
-    // Default runner account for testing
-    const defaultProfile: UserRunnerProfile = {
-      id: `usr_${Date.now()}`,
-      email,
-      fullName: 'Alex Chen',
-      username: '@AlexRunner',
-      city: 'The Doon School (Chandbagh)',
-      level: 1,
-      territoryKm2: 0.0,
-      localRank: 1,
-      zonesHeld: 0,
-      weeklyXp: 250,
-      streakDays: 1,
-      avatarUrl: '⚡',
-    };
-    this.saveLocalSession(defaultProfile);
-    return { profile: defaultProfile, error: null };
+  // Persist avatar / territory color changes to public.profiles
+  async updateProfile(
+    profile: UserRunnerProfile,
+    fields: { avatarUrl?: string; territoryColor?: string }
+  ): Promise<void> {
+    this.saveLocalSession({ ...profile, ...fields });
+    if (!this.isConfigured || !this.client || this.isDemoProfile(profile)) {
+      return;
+    }
+    const { error } = await this.client
+      .from('profiles')
+      .update({
+        ...(fields.avatarUrl !== undefined && { avatar_url: fields.avatarUrl }),
+        ...(fields.territoryColor !== undefined && { territory_color: fields.territoryColor }),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', profile.id);
+    if (error) {
+      console.warn('Could not update runner profile:', error.message);
+    }
   }
 
   async signOut(): Promise<void> {
