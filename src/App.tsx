@@ -39,22 +39,26 @@ const AppContent: React.FC = () => {
     };
   }, []);
 
-  const renderQuotaNotice = () => {
+  // Floats below the header so it never pushes the page down; dismissible
+  const renderMapsKeyNotice = () => {
     if (!quotaExceeded) return null;
     return (
-      <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-xs md:text-sm text-center sticky top-0 z-50 shadow-sm">
-        <span>
-          Google Maps Platform quota reached. If you are the app owner, visit{' '}
-          <a
-            href="https://developers.google.com/maps/ai/ai-studio?utm_campaign=gmp_mcp_codeassist_v1_aistudio#quota_exceeded_errors"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline font-semibold text-amber-950 hover:text-amber-800"
+      <div className="fixed top-[calc(4rem+env(safe-area-inset-top,0px))] inset-x-0 z-40 px-3 pt-2 pointer-events-none">
+        <div className="max-w-md mx-auto pointer-events-auto bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-3 py-2 text-[11px] shadow-sm flex items-start gap-2">
+          <span className="material-symbols-outlined text-[16px] text-amber-600">warning</span>
+          <span className="flex-1">
+            Google Maps couldn&apos;t verify its API key, so the map is limited. App owner: check the
+            Maps API key and billing in Google Cloud.
+          </span>
+          <button
+            type="button"
+            onClick={() => setQuotaExceeded(false)}
+            aria-label="Dismiss"
+            className="text-amber-700 hover:text-amber-900 cursor-pointer"
           >
-            maps developer site
-          </a>{' '}
-          for instructions to update your account.
-        </span>
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
       </div>
     );
   };
@@ -72,7 +76,6 @@ const AppContent: React.FC = () => {
         <AuthScreen onAuthSuccess={handleAuthSuccess} />
       ) : showConquestScreen ? (
         <div className="min-h-screen bg-[#F8FAFC] flex flex-col text-[#0F172A]">
-          {renderQuotaNotice()}
           <TopHeader
             title="ZONE BREACH INTEL"
             subtitle="Zone Control HUD"
@@ -85,7 +88,6 @@ const AppContent: React.FC = () => {
         </div>
       ) : currentTab === 'activity' ? (
         <div className="min-h-screen bg-[#F8FAFC] flex flex-col text-[#0F172A]">
-          {renderQuotaNotice()}
           <TopHeader
             title="ACTIVE RUN"
             subtitle="Live Zone Tracking"
@@ -99,7 +101,6 @@ const AppContent: React.FC = () => {
         </div>
       ) : (
         <div className="min-h-screen bg-[#F8FAFC] flex flex-col text-[#0F172A]">
-          {renderQuotaNotice()}
           <TopHeader />
           <main className="flex-1 flex flex-col">
             {currentTab === 'map' && <TerritoryMapScreen />}
@@ -108,6 +109,8 @@ const AppContent: React.FC = () => {
           <BottomNavBar />
         </div>
       )}
+
+      {isAuthenticated && renderMapsKeyNotice()}
 
       {/* Permissions Clearance Modal - appears as soon as app opens */}
       <PermissionsModal
