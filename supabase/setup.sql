@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   full_name TEXT NOT NULL,
   username TEXT UNIQUE NOT NULL,
   city TEXT DEFAULT 'The Doon School, Dehradun',
-  avatar_url TEXT DEFAULT '⚡',
+  avatar_url TEXT DEFAULT '🏅',
   territory_color TEXT DEFAULT '#2563EB',
   territory_km2 NUMERIC(10, 4) DEFAULT 0.0000,
   local_rank INTEGER DEFAULT 10,
@@ -191,8 +191,7 @@ DECLARE
   clean_handle TEXT;
   assigned_color TEXT;
   runner_colors TEXT[] := ARRAY[
-    '#2563EB', '#D97706', '#059669', '#9333EA', '#DC2626',
-    '#0891B2', '#EA580C', '#4F46E5', '#16A34A', '#E11D48'
+    '#2563EB', '#DC2626', '#16A34A', '#EAB308', '#9333EA'
   ];
   color_index INTEGER;
 BEGIN
@@ -221,7 +220,7 @@ BEGIN
     clean_name,
     clean_handle,
     COALESCE(NEW.raw_user_meta_data->>'city', 'The Doon School, Dehradun'),
-    COALESCE(NEW.raw_user_meta_data->>'avatar_url', '⚡'),
+    COALESCE(NEW.raw_user_meta_data->>'avatar_url', '🏅'),
     assigned_color,
     0.0000
   );

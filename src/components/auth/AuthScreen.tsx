@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { supabaseService, UserRunnerProfile } from '../../services/supabaseService';
 import { audioService } from '../../services/audioService';
 import { useZoneRush } from '../../context/ZoneRushContext';
-import { EMOJI_AVATAR_OPTIONS } from '../../utils/emojiAvatars';
+import { EMOJI_AVATAR_OPTIONS, DEFAULT_AVATAR_EMOJI } from '../../utils/emojiAvatars';
 
 interface AuthScreenProps {
   onAuthSuccess: (profile: UserRunnerProfile) => void;
@@ -21,7 +21,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   // Post-Signup Emoji Avatar Selection Step
   const [showEmojiStep, setShowEmojiStep] = useState(false);
   const [pendingProfile, setPendingProfile] = useState<UserRunnerProfile | null>(null);
-  const [selectedEmoji, setSelectedEmoji] = useState<string>('⚡');
+  const [selectedEmoji, setSelectedEmoji] = useState<string>(DEFAULT_AVATAR_EMOJI);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,8 +119,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
             </div>
           </div>
 
-          {/* 10 Emoji Selection Grid */}
-          <div className="grid grid-cols-5 gap-2.5 pt-1">
+          {/* 6 Emoji Selection Grid */}
+          <div className="grid grid-cols-3 gap-2.5 pt-1">
             {EMOJI_AVATAR_OPTIONS.map((opt) => {
               const isSelected = selectedEmoji === opt.emoji;
               return (

@@ -4,15 +4,13 @@ export interface EmojiAvatarOption {
   description: string;
 }
 
+export const DEFAULT_AVATAR_EMOJI = '🏅';
+
 export const EMOJI_AVATAR_OPTIONS: EmojiAvatarOption[] = [
-  { emoji: '⚡', name: 'Lightning', description: 'Swift & energetic' },
-  { emoji: '🏃', name: 'Runner', description: 'Speed & endurance' },
-  { emoji: '🐆', name: 'Cheetah', description: 'Apex sprinter' },
+  { emoji: '🏃‍♀️', name: 'Sprinter', description: 'Speed on the track' },
   { emoji: '🦅', name: 'Eagle', description: 'Soaring vision' },
-  { emoji: '🔥', name: 'Flame', description: 'Relentless drive' },
-  { emoji: '🏆', name: 'Trophy', description: 'Victory mindset' },
-  { emoji: '🐺', name: 'Wolf', description: 'Territory stalker' },
-  { emoji: '🦁', name: 'Lion', description: 'Campus dominator' },
-  { emoji: '👟', name: 'Kicks', description: 'Road & track master' },
-  { emoji: '🚀', name: 'Rocket', description: 'Explosive pace' },
+  { emoji: '🚴', name: 'Cyclist', description: 'Endurance on wheels' },
+  { emoji: '🏊', name: 'Swimmer', description: 'Cross-training athlete' },
+  { emoji: '🧗', name: 'Climber', description: 'Hill specialist' },
+  { emoji: '🏅', name: 'Medal', description: 'Race finisher' },
 ];

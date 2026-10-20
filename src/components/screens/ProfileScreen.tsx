@@ -3,7 +3,7 @@ import { useZoneRush } from '../../context/ZoneRushContext';
 import { supabaseService } from '../../services/supabaseService';
 import { audioService } from '../../services/audioService';
 import { TERRITORY_PALETTE } from '../../utils/userColors';
-import { EMOJI_AVATAR_OPTIONS } from '../../utils/emojiAvatars';
+import { EMOJI_AVATAR_OPTIONS, DEFAULT_AVATAR_EMOJI } from '../../utils/emojiAvatars';
 import { RunnerAvatar } from '../common/RunnerAvatar';
 import { AreaLeaderboard } from '../profile/AreaLeaderboard';
 import { FeedbackBox } from '../profile/FeedbackBox';
@@ -38,17 +38,9 @@ export const ProfileScreen: React.FC = () => {
             </div>
 
             <div className="flex flex-col">
-              <div className="flex items-center gap-1.5">
-                <h2 className="font-sans text-lg font-extrabold text-slate-900">
-                  {currentUser?.fullName || 'Alex Chen'}
-                </h2>
-                <span
-                  className="material-symbols-outlined text-[18px] text-blue-600"
-                  style={{ fontVariationSettings: "'FILL' 1" }}
-                >
-                  verified
-                </span>
-              </div>
+              <h2 className="font-sans text-lg font-extrabold text-slate-900">
+                {currentUser?.fullName || 'Runner'}
+              </h2>
               <span className="font-metric text-xs text-slate-500 font-semibold">
                 {currentUser?.username || '@AlexRunner'}
               </span>
@@ -61,39 +53,21 @@ export const ProfileScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Territory Dominance Banner */}
-          <div className="p-4 bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-xl shadow-xs flex items-center justify-between">
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                Active Campus Territory
-              </span>
-              <span className="text-base font-extrabold text-amber-300 mt-0.5">
-                The Doon School (Chandbagh)
-              </span>
-              <span className="text-[11px] text-slate-300">
-                72 Acres
-              </span>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-amber-400">
-              <span className="material-symbols-outlined text-[22px]">domain</span>
-            </div>
-          </div>
-
-          {/* Preferred Profile Emoji Icon (10 Athletic Options) */}
+          {/* Preferred Profile Emoji Icon (6 Athletic Options) */}
           <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-xl leading-none">
                   {currentUser?.avatarUrl && !currentUser.avatarUrl.startsWith('http')
                     ? currentUser.avatarUrl
-                    : '⚡'}
+                    : DEFAULT_AVATAR_EMOJI}
                 </span>
                 <span className="text-xs font-bold text-slate-800 uppercase tracking-wider font-sans">
                   Profile Picture Emoji
                 </span>
               </div>
               <span className="text-[11px] font-bold text-slate-500 font-sans">
-                10 Athletic Icons
+                6 Athletic Icons
               </span>
             </div>
 
@@ -101,7 +75,7 @@ export const ProfileScreen: React.FC = () => {
               Choose your athletic avatar emoji icon to represent you across The Doon School territory and leaderboards.
             </p>
 
-            <div className="grid grid-cols-5 gap-2 pt-1">
+            <div className="grid grid-cols-3 gap-2 pt-1">
               {EMOJI_AVATAR_OPTIONS.map((opt) => {
                 const isSelected = currentUser?.avatarUrl === opt.emoji;
                 return (

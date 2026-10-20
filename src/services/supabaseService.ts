@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
+import { DEFAULT_AVATAR_EMOJI } from '../utils/emojiAvatars';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -136,7 +137,7 @@ class SupabaseService {
       zonesHeld: row?.zones_held ?? 0,
       weeklyXp: row?.weekly_xp ?? 0,
       streakDays: 1,
-      avatarUrl: row?.avatar_url || meta.avatar_url || '⚡',
+      avatarUrl: row?.avatar_url || meta.avatar_url || DEFAULT_AVATAR_EMOJI,
       territoryColor: row?.territory_color || undefined,
     };
   }
@@ -231,7 +232,7 @@ class SupabaseService {
       zonesHeld: 0,
       weeklyXp: 250,
       streakDays: 1,
-      avatarUrl: '⚡',
+      avatarUrl: DEFAULT_AVATAR_EMOJI,
     };
     this.saveLocalSession(userProfile);
     return { profile: userProfile, error: null };
@@ -310,7 +311,7 @@ class SupabaseService {
         id: row.id,
         fullName: row.full_name,
         username: row.username,
-        avatarUrl: row.avatar_url || '⚡',
+        avatarUrl: row.avatar_url || DEFAULT_AVATAR_EMOJI,
         territoryColor: row.territory_color || '#2563EB',
         territoryKm2: Number(row.territory_km2 ?? 0),
       }))

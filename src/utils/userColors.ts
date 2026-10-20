@@ -7,111 +7,48 @@ export interface TerritoryColorOption {
   badgeClass: string;
 }
 
+// Five clearly different hues so runners' territories are never confused
 export const TERRITORY_PALETTE: TerritoryColorOption[] = [
   {
-    id: 'cobalt',
-    name: 'Cobalt Blue',
+    id: 'blue',
+    name: 'Blue',
     hex: '#2563EB',
     fillRgba: 'rgba(37, 99, 235, 0.28)',
     badgeClass: 'bg-blue-600',
   },
   {
-    id: 'emerald',
-    name: 'Emerald Green',
-    hex: '#059669',
-    fillRgba: 'rgba(5, 150, 105, 0.28)',
-    badgeClass: 'bg-emerald-600',
+    id: 'red',
+    name: 'Red',
+    hex: '#DC2626',
+    fillRgba: 'rgba(220, 38, 38, 0.28)',
+    badgeClass: 'bg-red-600',
   },
   {
-    id: 'orange',
-    name: 'Athletic Orange',
-    hex: '#FC5200',
-    fillRgba: 'rgba(252, 82, 0, 0.28)',
-    badgeClass: 'bg-[#FC5200]',
+    id: 'green',
+    name: 'Green',
+    hex: '#16A34A',
+    fillRgba: 'rgba(22, 163, 74, 0.28)',
+    badgeClass: 'bg-green-600',
+  },
+  {
+    id: 'yellow',
+    name: 'Yellow',
+    hex: '#EAB308',
+    fillRgba: 'rgba(234, 179, 8, 0.28)',
+    badgeClass: 'bg-yellow-500',
   },
   {
     id: 'purple',
-    name: 'Electric Purple',
-    hex: '#7C3AED',
-    fillRgba: 'rgba(124, 58, 237, 0.28)',
+    name: 'Purple',
+    hex: '#9333EA',
+    fillRgba: 'rgba(147, 51, 234, 0.28)',
     badgeClass: 'bg-purple-600',
-  },
-  {
-    id: 'crimson',
-    name: 'Crimson Rose',
-    hex: '#E11D48',
-    fillRgba: 'rgba(225, 29, 72, 0.28)',
-    badgeClass: 'bg-rose-600',
-  },
-  {
-    id: 'cyan',
-    name: 'Cyan Neon',
-    hex: '#0891B2',
-    fillRgba: 'rgba(8, 145, 178, 0.28)',
-    badgeClass: 'bg-cyan-600',
-  },
-  {
-    id: 'amber',
-    name: 'Amber Gold',
-    hex: '#D97706',
-    fillRgba: 'rgba(217, 119, 6, 0.28)',
-    badgeClass: 'bg-amber-600',
-  },
-  {
-    id: 'indigo',
-    name: 'Deep Indigo',
-    hex: '#4F46E5',
-    fillRgba: 'rgba(79, 70, 229, 0.28)',
-    badgeClass: 'bg-indigo-600',
-  },
-  {
-    id: 'lime',
-    name: 'Volt Lime',
-    hex: '#65A30D',
-    fillRgba: 'rgba(101, 163, 13, 0.28)',
-    badgeClass: 'bg-lime-600',
-  },
-  {
-    id: 'fuchsia',
-    name: 'Cyber Fuchsia',
-    hex: '#C026D3',
-    fillRgba: 'rgba(192, 38, 211, 0.28)',
-    badgeClass: 'bg-fuchsia-600',
   },
 ];
 
-// Explicit distinct colors for known runners to guarantee zero collision
-export const KNOWN_RUNNER_COLORS: Record<string, string> = {
-  '@AlexRunner': '#2563EB', // Cobalt Blue (Current User)
-  'Alex Chen': '#2563EB',
-  '@AaravTurf': '#D97706',  // Amber Gold
-  'Aarav': '#D97706',
-  '@KabirFast': '#059669',  // Emerald Green
-  'Kabir': '#059669',
-  '@NitroMaya': '#7C3AED',  // Electric Purple
-  'Nitro': '#7C3AED',
-  '@GhostSprint': '#0891B2', // Cyan Neon
-  'GhostSprint': '#0891B2',
-  '@ViperRun': '#E11D48',    // Crimson Rose
-  'ViperRun': '#E11D48',
-  '@Zenith': '#4F46E5',      // Deep Indigo
-  'Zenith': '#4F46E5',
-  '@VoltKicks': '#65A30D',   // Volt Lime
-  'VoltKicks': '#65A30D',
-  '@BlazeKicks': '#FC5200',  // Athletic Orange
-  'BlazeKicks': '#FC5200',
-};
-
-// Returns a deterministic unique territory color for every user based on their ID / email / username
+// Returns a deterministic territory color for every user based on their ID / email / username
 export const getUniqueUserColor = (identifier?: string | null): TerritoryColorOption => {
   if (!identifier) return TERRITORY_PALETTE[0];
-
-  // Check known runners first
-  if (KNOWN_RUNNER_COLORS[identifier]) {
-    const hex = KNOWN_RUNNER_COLORS[identifier];
-    const match = TERRITORY_PALETTE.find((p) => p.hex.toLowerCase() === hex.toLowerCase());
-    if (match) return match;
-  }
 
   let hash = 0;
   for (let i = 0; i < identifier.length; i++) {

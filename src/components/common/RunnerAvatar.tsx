@@ -1,4 +1,5 @@
 import React from 'react';
+import { DEFAULT_AVATAR_EMOJI } from '../../utils/emojiAvatars';
 
 interface RunnerAvatarProps {
   avatarUrl?: string | null;
@@ -29,7 +30,7 @@ export const RunnerAvatar: React.FC<RunnerAvatarProps> = ({
   }
 
   // Treat as Emoji Avatar
-  const emoji = avatarUrl && avatarUrl.trim().length > 0 ? avatarUrl.trim() : '⚡';
+  const emoji = avatarUrl && avatarUrl.trim().length > 0 ? avatarUrl.trim() : DEFAULT_AVATAR_EMOJI;
 
   return (
     <div
