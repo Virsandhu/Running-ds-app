@@ -18,8 +18,32 @@ interface GoogleMapComponentProps {
 // How long after a recenter tap the camera keeps following GPS fixes
 const RECENTER_FOLLOW_MS = 10000;
 
-// Pans to the runner only while following (active run) or just after a recenter tap,
-// so the map can be scrolled freely the rest of the time
+// Turn-by-turn style camera used while a run is active
+const NAV_ZOOM = 19;
+const NAV_TILT = 45;
+const NAV_ANIMATION_MS = 1200;
+
+// Eases zoom and tilt from the current camera to the target (moveCamera alone jumps)
+const animateCamera = (map: google.maps.Map, target: { zoom: number; tilt: number }) => {
+  const startZoom = map.getZoom() ?? target.zoom;
+  const startTilt = map.getTilt() ?? 0;
+  const startedAt = performance.now();
+  let frame = 0;
+  const step = (now: number) => {
+    const progress = Math.min(1, (now - startedAt) / NAV_ANIMATION_MS);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    map.moveCamera({
+      zoom: startZoom + (target.zoom - startZoom) * eased,
+      tilt: startTilt + (target.tilt - startTilt) * eased,
+    });
+    if (progress < 1) frame = requestAnimationFrame(step);
+  };
+  frame = requestAnimationFrame(step);
+  return () => cancelAnimationFrame(frame);
+};
+
+// While following (active run) the camera zooms in, tilts and tracks the runner.
+// Otherwise it pans only just after a recenter tap, so the map can be scrolled freely.
 const MapCameraController: React.FC<{
   center: { lat: number; lng: number };
   zoom: number;
@@ -30,18 +54,35 @@ const MapCameraController: React.FC<{
 
   useEffect(() => {
     if (!map) return;
+    if (follow) {
+      map.moveCamera({ center });
+      return animateCamera(map, { zoom: NAV_ZOOM, tilt: NAV_TILT });
+    }
+    map.moveCamera({ tilt: 0 });
+  }, [map, follow]);
+
+  useEffect(() => {
+    if (!map) return;
     if (follow || Date.now() - recenterRequestedAt < RECENTER_FOLLOW_MS) {
       map.panTo(center);
     }
   }, [map, center.lat, center.lng, follow, recenterRequestedAt]);
 
   useEffect(() => {
-    if (!map) return;
+    if (!map || follow) return;
     map.setZoom(Math.min(20, Math.max(MIN_MAP_ZOOM, zoom)));
-  }, [map, zoom]);
+  }, [map, zoom, follow]);
 
   return null;
 };
+
+// Marker size relative to the map: full size at NAV_ZOOM, halving every 4 zoom levels out
+const markerScaleForZoom = (zoom: number) => Math.min(1.1, Math.pow(2, (zoom - NAV_ZOOM) / 4));
+
+// Scales marker content around its anchor point (bottom centre)
+const ScaledMarkerContent: React.FC<{ scale: number; children: React.ReactNode }> = ({ scale, children }) => (
+  <div style={{ transform: `scale(${scale})`, transformOrigin: 'bottom center' }}>{children}</div>
+);
 
 // Accuracy Circle Overlay
 const AccuracyCircleOverlay: React.FC<{
@@ -202,51 +243,6 @@ const DOON_SCHOOL_LANDMARKS = [
     icon: 'account_balance',
     color: 'bg-indigo-600',
   },
-  {
-    id: 'doon-rosebowl',
-    name: 'Rose Bowl',
-    sub: 'Stone Amphitheatre',
-    lat: 30.3352,
-    lng: 78.0345,
-    icon: 'theater_comedy',
-    color: 'bg-rose-600',
-  },
-  {
-    id: 'doon-skinners',
-    name: "Skinner's Field",
-    sub: 'Athletics & Pavilion',
-    lat: 30.3326,
-    lng: 78.0336,
-    icon: 'sprint',
-    color: 'bg-emerald-600',
-  },
-  {
-    id: 'doon-mall-gate',
-    name: 'Mall Road Gate',
-    sub: 'North Main Entrance',
-    lat: 30.3380,
-    lng: 78.0318,
-    icon: 'door_front',
-    color: 'bg-amber-600',
-  },
-  {
-    id: 'doon-chakrata-gate',
-    name: 'Chakrata Gate',
-    sub: 'South Entrance',
-    lat: 30.3298,
-    lng: 78.0302,
-    icon: 'login',
-    color: 'bg-blue-600',
-  },
-  {
-    id: 'doon-houses',
-    name: 'Boarding Houses',
-    sub: 'Jaipur • Tata • Kashmir • Oberoi',
-    lat: 30.3348,
-    lng: 78.0272,
-    icon: 'villa',
-    color: 'bg-purple-600',
-  },
 ];
 
 // Outside Campus Inverted Mask: dims (but still shows) the surroundings so the campus stands out
@@ -344,7 +340,10 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
     userTerritoryColor,
     runTelemetry,
     recenterRequestedAt,
+    isRunning,
   } = useZoneRush();
+  const [cameraZoom, setCameraZoom] = useState<number>(16);
+  const markerScale = markerScaleForZoom(cameraZoom);
 
   const [mapTypeId, setMapTypeId] = useState<string>('hybrid');
   const [selectedRoad, setSelectedRoad] = useState<RunnableRoad | null>(null);
@@ -389,6 +388,7 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
         }}
         mapTypeId={mapTypeId}
         gestureHandling="greedy"
+        onZoomChanged={(e) => setCameraZoom(e.detail.zoom)}
         disableDefaultUI={true}
         className="w-full h-full"
       >
@@ -396,7 +396,7 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
         <MapCameraController
           center={userLocation}
           zoom={zoomLevel || zoom}
-          follow={currentTab === 'activity'}
+          follow={currentTab === 'activity' && isRunning}
           recenterRequestedAt={recenterRequestedAt}
         />
 
@@ -462,6 +462,7 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
               onClick={() => setSelectedSector(sec)}
               zIndex={11}
             >
+              <ScaledMarkerContent scale={markerScale}>
               <div className="flex flex-col items-center cursor-pointer select-none group">
                 <div
                   className="px-2 py-0.5 rounded-full shadow-md text-white text-[9px] font-black uppercase tracking-tight flex items-center gap-1 border border-white/70 group-hover:scale-105 transition-transform backdrop-blur-xs"
@@ -479,12 +480,14 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
                   style={{ backgroundColor: color }}
                 />
               </div>
+              </ScaledMarkerContent>
             </AdvancedMarker>
           );
         })}
 
         {/* The Doon School Campus Main Title Badge */}
         <AdvancedMarker position={{ lat: 30.3380, lng: 78.0318 }} zIndex={12}>
+          <ScaledMarkerContent scale={markerScale}>
           <div
             onClick={() => {
               const s = sectors[0];
@@ -515,6 +518,7 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
             </div>
             <div className="w-1.5 h-1.5 bg-slate-950 rotate-45 -mt-0.5 border-r-2 border-b-2 border-sky-400" />
           </div>
+          </ScaledMarkerContent>
         </AdvancedMarker>
 
         {/* USER COVERED AREA: Highlighted & Shaded Very Lightly in Chosen Territory Color */}
@@ -556,6 +560,7 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
         {/* 4. Start Point Pin Marker */}
         {runTelemetry?.gpsTrail && runTelemetry.gpsTrail.length >= 1 && (
           <AdvancedMarker position={runTelemetry.gpsTrail[0]}>
+            <ScaledMarkerContent scale={markerScale}>
             <div className="flex flex-col items-center">
               <div className="bg-emerald-600 text-white font-black text-[9px] px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-white">
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
@@ -563,6 +568,7 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
               </div>
               <div className="w-1.5 h-1.5 bg-emerald-600 rotate-45 -mt-0.5" />
             </div>
+            </ScaledMarkerContent>
           </AdvancedMarker>
         )}
 
@@ -575,42 +581,13 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
           />
         )}
 
-        {/* Interactive Road Label Badges on Key Runnable Roads */}
-        {showRoadsHighlight &&
-          runnableRoads.slice(0, 7).map((road) => {
-            const midIdx = Math.floor(road.path.length / 2);
-            const midPoint = road.path[midIdx] || road.path[0];
-            const isSelected = selectedRoad?.id === road.id;
-
-            return (
-              <AdvancedMarker
-                key={`road-label-${road.id}`}
-                position={midPoint}
-                onClick={() => setSelectedRoad(road)}
-              >
-                <div
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full shadow-xs border text-[9px] font-bold tracking-tight transition-all cursor-pointer select-none ${
-                    isSelected
-                      ? 'bg-[#FC5200] text-white border-white scale-105 shadow-md'
-                      : 'bg-slate-900/80 text-slate-200 border-slate-600/70 hover:bg-slate-900 hover:text-white backdrop-blur-xs'
-                  }`}
-                  title={`${road.name} • ${formatMetres(road.distanceKm)} m (Click to view claim yield)`}
-                >
-                  <span className="material-symbols-outlined text-[10px] text-slate-300">
-                    {road.type === 'track' ? 'sprint' : 'alt_route'}
-                  </span>
-                  <span className="whitespace-nowrap">{road.name}</span>
-                </div>
-              </AdvancedMarker>
-            );
-          })}
-
         {/* The Doon School Campus Landmarks */}
         {DOON_SCHOOL_LANDMARKS.map((landmark) => (
           <AdvancedMarker
             key={landmark.id}
             position={{ lat: landmark.lat, lng: landmark.lng }}
           >
+            <ScaledMarkerContent scale={markerScale}>
             <div className="flex flex-col items-center pointer-events-none select-none">
               <div className="bg-slate-900/90 text-white px-2 py-0.5 rounded-md shadow-md border border-slate-700/80 flex items-center gap-1 backdrop-blur-xs">
                 <span className={`w-3.5 h-3.5 rounded-full ${landmark.color} flex items-center justify-center text-[9px] text-white`}>
@@ -622,11 +599,13 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
               </div>
               <div className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5" />
             </div>
+            </ScaledMarkerContent>
           </AdvancedMarker>
         ))}
 
         {/* Real User GPS Runner Advanced Marker Pulsing in User's Distinct Territory Color */}
         <AdvancedMarker position={userLocation}>
+          <ScaledMarkerContent scale={markerScale}>
           <div className="relative flex flex-col items-center">
             {/* Runner ID Chip */}
             <div
@@ -666,6 +645,7 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
               />
             </div>
           </div>
+          </ScaledMarkerContent>
         </AdvancedMarker>
       </Map>
 

@@ -6,6 +6,7 @@ import { TERRITORY_PALETTE } from '../../utils/userColors';
 import { EMOJI_AVATAR_OPTIONS } from '../../utils/emojiAvatars';
 import { RunnerAvatar } from '../common/RunnerAvatar';
 import { AreaLeaderboard } from '../profile/AreaLeaderboard';
+import { FeedbackBox } from '../profile/FeedbackBox';
 
 export const ProfileScreen: React.FC = () => {
   const {
@@ -199,6 +200,8 @@ export const ProfileScreen: React.FC = () => {
         </div>
 
         <AreaLeaderboard />
+
+        <FeedbackBox />
 
         {/* Sign Out CTA */}
         <div className="pt-2">
