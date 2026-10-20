@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useZoneRush } from '../../context/ZoneRushContext';
 import { audioService } from '../../services/audioService';
 
-// FormSubmit relays the message to this inbox; the first submission sends a one-time activation email
-const FEEDBACK_ENDPOINT = 'https://formsubmit.co/ajax/vir.53.2028@doonschool.com';
+// FormSubmit relays the message to the developer's inbox; the random alias keeps the address out of the code
+const FEEDBACK_ENDPOINT = 'https://formsubmit.co/ajax/c0a0c4d05454fdf41b7ea71a87e7e32a';
 const MAX_LENGTH = 2000;
 
 type SendStatus = { kind: 'idle' } | { kind: 'sending' } | { kind: 'sent' } | { kind: 'error'; message: string };
