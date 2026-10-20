@@ -9,6 +9,7 @@ export interface Sector {
   areaKm2: number;
   points: string; // SVG polygon points string
   paths?: { lat: number; lng: number }[];
+  rings?: { lat: number; lng: number }[][]; // merged multi-part shape (shells + holes), drawn instead of paths
   centroid?: { lat: number; lng: number };
   isContested?: boolean;
   defenseWindowMinutes?: number;

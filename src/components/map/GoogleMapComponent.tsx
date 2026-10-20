@@ -120,7 +120,8 @@ const AccuracyCircleOverlay: React.FC<{
 
 // Polygon Overlay helper
 const PolygonOverlay: React.FC<{
-  paths: { lat: number; lng: number }[];
+  // One ring, or several rings (multi-part shape with holes) filled as a single area
+  paths: { lat: number; lng: number }[] | { lat: number; lng: number }[][];
   strokeColor: string;
   fillColor: string;
   strokeWeight?: number;
@@ -437,7 +438,7 @@ export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({
           return (
             <PolygonOverlay
               key={`sector-poly-${sec.id}`}
-              paths={sec.paths || []}
+              paths={sec.rings || sec.paths || []}
               strokeColor={color}
               fillColor={color}
               strokeWeight={isUser ? 2.5 : 2.0}

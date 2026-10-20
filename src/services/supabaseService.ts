@@ -44,16 +44,30 @@ export interface AreaLeaderboardEntry {
   territoryKm2: number;
 }
 
-export interface RunTerritory {
-  id: string;
+type LatLng = { lat: number; lng: number };
+
+export interface RunnerTerritory {
   runnerId: string;
   fullName: string;
   username: string;
   territoryColor: string;
-  areaKm2: number;
-  createdAt: string;
-  trail: { lat: number; lng: number }[];
+  runCount: number;
+  coveredKm2: number;
+  rings: LatLng[][];
+  labelPoint: LatLng;
 }
+
+// GeoJSON Polygon / MultiPolygon -> flat list of rings ([lng, lat] -> {lat, lng})
+const geoJsonToRings = (shape: { type: string; coordinates: unknown }): LatLng[][] => {
+  const toRing = (ring: number[][]) => ring.map(([lng, lat]) => ({ lat, lng }));
+  if (shape.type === 'Polygon') {
+    return (shape.coordinates as number[][][]).map(toRing);
+  }
+  if (shape.type === 'MultiPolygon') {
+    return (shape.coordinates as number[][][][]).flat().map(toRing);
+  }
+  return [];
+};
 
 const LOCAL_STORAGE_KEY = 'zonerush_active_user';
 
@@ -303,39 +317,33 @@ class SupabaseService {
     );
   }
 
-  // Every saved run's exact GPS trail with its runner, oldest first
-  async fetchRunTerritories(): Promise<RunTerritory[] | null> {
+  // Each runner's runs merged into one territory shape (see supabase/territory-display.sql)
+  async fetchRunnerTerritories(): Promise<RunnerTerritory[] | null> {
     if (!this.isConfigured || !this.client) {
       return null;
     }
     const { data, error } = await this.client
-      .from('runs')
-      .select('id, runner_id, raw_gps_trail, territory_yield_km2, created_at, profiles(full_name, username, territory_color)')
-      .order('created_at', { ascending: true })
-      .limit(2000);
+      .from('runner_territories')
+      .select('runner_id, full_name, username, territory_color, run_count, covered_km2, shape, label_point');
     if (error) {
-      console.warn('Could not load run territories:', error.message);
+      console.warn('Could not load runner territories:', error.message);
       return null;
     }
     return data
-      .filter((row) => Array.isArray(row.raw_gps_trail) && row.raw_gps_trail.length >= 3)
       .map((row) => {
-        const runner = (Array.isArray(row.profiles) ? row.profiles[0] : row.profiles) as {
-          full_name: string;
-          username: string;
-          territory_color: string | null;
-        } | null;
+        const [lng, lat] = (row.label_point as { coordinates: number[] }).coordinates;
         return {
-          id: row.id,
           runnerId: row.runner_id,
-          fullName: runner?.full_name || 'Runner',
-          username: runner?.username || '@Runner',
-          territoryColor: runner?.territory_color || '#2563EB',
-          areaKm2: Number(row.territory_yield_km2 ?? 0),
-          createdAt: row.created_at,
-          trail: row.raw_gps_trail as { lat: number; lng: number }[],
+          fullName: row.full_name,
+          username: row.username,
+          territoryColor: row.territory_color || '#2563EB',
+          runCount: Number(row.run_count),
+          coveredKm2: Number(row.covered_km2 ?? 0),
+          rings: geoJsonToRings(row.shape as { type: string; coordinates: unknown }),
+          labelPoint: { lat, lng },
         };
-      });
+      })
+      .filter((territory) => territory.rings.length > 0);
   }
 
   // Calls back whenever any runner saves a new run

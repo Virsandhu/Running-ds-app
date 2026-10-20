@@ -163,40 +163,40 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     );
   }, [userTerritoryColor]);
 
-  // Show every runner's saved run areas on the map, and refresh when anyone finishes a run
+  // Show each runner's territory (all their runs merged into one shape, so repeat runs
+  // over the same ground add no extra shade), and refresh when anyone finishes a run
+  const reloadTerritoriesRef = useRef<() => void>(() => {});
   useEffect(() => {
     if (!supabaseService.isConfigured || !currentUser) return;
     const myId = currentUser.id;
-    const loadRunTerritories = () => {
-      supabaseService.fetchRunTerritories().then((runs) => {
-        if (!runs) return;
+    const loadTerritories = () => {
+      supabaseService.fetchRunnerTerritories().then((territories) => {
+        if (!territories) return;
         setSectors(
-          runs.map((run) => {
-            const isMine = run.runnerId === myId;
-            const centroid = {
-              lat: run.trail.reduce((sum, p) => sum + p.lat, 0) / run.trail.length,
-              lng: run.trail.reduce((sum, p) => sum + p.lng, 0) / run.trail.length,
-            };
+          territories.map((t) => {
+            const isMine = t.runnerId === myId;
             return {
-              id: `run-${run.id}`,
-              code: new Date(run.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
-              name: `${run.fullName}'s run`,
-              owner: run.fullName,
-              ownerHandle: isMine ? `${run.username} (YOU)` : run.username,
-              ownerColor: run.territoryColor,
-              fillColor: hexToRgba(run.territoryColor, 0.28),
-              areaKm2: run.areaKm2,
+              id: `territory-${t.runnerId}`,
+              code: `${t.runCount} ${t.runCount === 1 ? 'RUN' : 'RUNS'}`,
+              name: `${t.fullName}'s territory`,
+              owner: t.fullName,
+              ownerHandle: isMine ? `${t.username} (YOU)` : t.username,
+              ownerColor: t.territoryColor,
+              fillColor: hexToRgba(t.territoryColor, 0.28),
+              areaKm2: t.coveredKm2,
               points: '',
-              paths: [...run.trail, run.trail[0]],
-              centroid,
+              paths: t.rings[0],
+              rings: t.rings,
+              centroid: t.labelPoint,
               isContested: false,
             };
           })
         );
       });
     };
-    loadRunTerritories();
-    return supabaseService.onRunInserted(loadRunTerritories);
+    reloadTerritoriesRef.current = loadTerritories;
+    loadTerritories();
+    return supabaseService.onRunInserted(loadTerritories);
   }, [currentUser?.id]);
 
   const setUserTerritoryColor = (color: string) => {
@@ -865,8 +865,9 @@ export const ZoneRushProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         polygonPaths: conquest.polygonPaths,
         rawGpsTrail: conquest.rawGpsTrail,
       }).then(({ profile }) => {
-        // Replace the optimistic local totals with the server-computed ones
+        // Replace the optimistic local totals and map shape with the server-computed ones
         if (profile) setCurrentUser(profile);
+        reloadTerritoriesRef.current();
       });
 
       // Update active user profile
